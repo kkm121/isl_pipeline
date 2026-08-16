@@ -9,6 +9,7 @@ logs/
 metrics/
 experiments/
 results/
+.state/
 
 # Python caching and compiled files
 __pycache__/

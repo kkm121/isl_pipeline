@@ -1,1 +1,25 @@
-"""Deterministic orchestration layer — state machine, resource budgets, experiment registry."""
+"""Deterministic orchestration layer — state machine, resource budgets, experiment registry, pipeline controller."""
+
+from src.orchestrator.pipeline_controller import GateViolationError, PipelineController
+from src.orchestrator.resource_budgets import ResourceBudget, ResourceTracker
+from src.orchestrator.state_machine import (
+    InvalidTransitionError,
+    PipelineState,
+    PipelineStateMachine,
+    RetryPolicy,
+)
+
+# Alias for backwards compatibility
+ResourceBudgetTracker = ResourceTracker
+
+__all__ = [
+    "GateViolationError",
+    "InvalidTransitionError",
+    "PipelineController",
+    "PipelineState",
+    "PipelineStateMachine",
+    "ResourceBudget",
+    "ResourceBudgetTracker",
+    "ResourceTracker",
+    "RetryPolicy",
+]

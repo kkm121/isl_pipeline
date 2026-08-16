@@ -143,7 +143,9 @@ class PipelineStateMachine:
         self._tree_baseline: dict[str, Any] | None = None
 
     def capture_tree_baseline(self) -> dict[str, Any]:
-        """Capture the Git tree baseline state before an implementation or remediation turn."""
+        """Capture and persist the Git tree baseline state immediately before an implementation or remediation turn."""
+        head_sha = "unknown"
+        status_lines: list[str] = []
         try:
             head_proc = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
@@ -152,7 +154,8 @@ class PipelineStateMachine:
                 text=True,
                 check=False,
             )
-            head_sha = head_proc.stdout.strip() if head_proc.returncode == 0 else "unknown"
+            if head_proc.returncode == 0:
+                head_sha = head_proc.stdout.strip()
 
             status_proc = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -162,33 +165,55 @@ class PipelineStateMachine:
                 check=False,
             )
             status_output = status_proc.stdout.strip()
-
-            self._tree_baseline = {
-                "head_sha": head_sha,
-                "status_lines": status_output.splitlines() if status_output else [],
-                "timestamp": time.time(),
-            }
-            logger.info(
-                "Captured Git tree baseline: HEAD=%s, dirty_files=%d",
-                head_sha,
-                len(self._tree_baseline["status_lines"]),
-            )
-            return self._tree_baseline
+            if status_output:
+                status_lines = status_output.splitlines()
         except Exception as e:
-            logger.warning("Could not capture Git tree baseline: %s", str(e))
-            self._tree_baseline = {
-                "head_sha": "none",
-                "status_lines": [],
-                "timestamp": time.time(),
-            }
-            return self._tree_baseline
+            logger.warning("Could not capture Git tree baseline via CLI: %s", str(e))
+            head_sha = "none"
+
+        self._tree_baseline = {
+            "head_sha": head_sha,
+            "status_lines": status_lines,
+            "timestamp": time.time(),
+        }
+
+        # Persist baseline to disk for consumption by verify.sh and downstream gates
+        try:
+            state_dir = self.project_root / ".state"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            with open(state_dir / "tree_baseline.sha", "w") as f:
+                f.write(head_sha)
+            with open(state_dir / "tree_baseline.json", "w") as f:
+                json.dump(self._tree_baseline, f, indent=2)
+        except OSError:
+            pass
+
+        logger.info(
+            "Captured and persisted Git tree baseline: HEAD=%s, dirty_files=%d",
+            head_sha,
+            len(status_lines),
+        )
+        return self._tree_baseline
 
     def verify_git_diff(self, expected_modifications: bool = True) -> tuple[bool, dict[str, Any]]:
-        """Perform real before/after Git tree diff verification.
+        """Perform real before/after Git tree diff verification against the persisted turn baseline.
 
-        If expected_modifications=True and the diff is zero, rejects and flags failure.
+        If expected_modifications=True and the diff is zero or baseline is missing, rejects and flags failure.
         """
         try:
+            state_dir = self.project_root / ".state"
+            baseline_file = state_dir / "tree_baseline.json"
+            if not self._tree_baseline and baseline_file.exists():
+                with open(baseline_file, "r") as f:
+                    self._tree_baseline = json.load(f)
+
+            if not self._tree_baseline:
+                logger.error("DIFF_VERIFY failed: No turn baseline found in memory or at .state/tree_baseline.json")
+                return False, {
+                    "error": "Missing baseline: Implementation turn did not establish a persisted Git tree baseline.",
+                    "has_changes": False,
+                }
+
             status_proc = subprocess.run(
                 ["git", "status", "--porcelain"],
                 cwd=str(self.project_root),
@@ -238,6 +263,10 @@ class PipelineStateMachine:
             raise InvalidTransitionError(f"Cannot transition from {self.current_state.name} to {target.name}")
 
         actual_target = target
+
+        # Automatically capture baseline immediately upon entering IMPLEMENTATION or RETRY
+        if target in (PipelineState.IMPLEMENTATION, PipelineState.RETRY):
+            self.capture_tree_baseline()
 
         # Handle Diff Verification automatically if entering DIFF_VERIFY
         if target == PipelineState.DIFF_VERIFY:

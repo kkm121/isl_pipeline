@@ -1,6 +1,7 @@
 import io
 import json
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -290,3 +291,51 @@ def test_state_machine_config_mutation_limit_escalates_to_human_gate(tmp_path):
         sm.mutate_config(str(test_config), {"training": {"batch_size": 4}}, reason="OOM fix 3")
 
     assert sm.get_state() == PipelineState.HUMAN_GATE
+
+
+def test_account_broker_authenticated_session_lifecycle(tmp_path):
+    """Verify authenticated_session context manager guarantees temporary directory cleanup."""
+    creds_dir = tmp_path / "credentials"
+    creds_dir.mkdir()
+    (creds_dir / "kaggle_1.json").write_text('{"username": "user1", "key": "key1"}')
+    (creds_dir / "kaggle_accounts.json").write_text(
+        '{"accounts": [{"account_id": "kaggle_1", "username": "user1", "max_concurrent": 2}]}'
+    )
+
+    broker = AccountBroker(credentials_dir=str(creds_dir), db_path=str(tmp_path / "k.db"))
+
+    # Normal exit
+    created_dir = None
+    with broker.authenticated_session("kaggle_1") as auth_env:
+        assert "KAGGLE_CONFIG_DIR" in auth_env
+        created_dir = Path(auth_env["KAGGLE_CONFIG_DIR"])
+        assert created_dir.exists()
+        assert (created_dir / "kaggle.json").exists()
+
+    assert not created_dir.exists()
+
+    # Exception exit
+    try:
+        with broker.authenticated_session("kaggle_1") as auth_env:
+            exc_dir = Path(auth_env["KAGGLE_CONFIG_DIR"])
+            assert exc_dir.exists()
+            raise RuntimeError("Simulation error")
+    except RuntimeError:
+        pass
+
+    assert not exc_dir.exists()
+
+
+def test_state_machine_persists_tree_baseline_on_implementation(tmp_path):
+    """Verify that transitioning to IMPLEMENTATION automatically writes .state/tree_baseline.sha and .state/tree_baseline.json."""
+    sm = PipelineStateMachine(project_root=str(tmp_path))
+    sm.transition(PipelineState.SPECIFICATION, {"spec": "data"}, agent="principal-engineer")
+    sm.transition(PipelineState.TEST_PLAN, {"plan": "tests"}, agent="test-engineer")
+    sm.transition(PipelineState.IMPLEMENTATION, {"code": "write"}, agent="code-writer")
+
+    baseline_sha = tmp_path / ".state" / "tree_baseline.sha"
+    baseline_json = tmp_path / ".state" / "tree_baseline.json"
+
+    assert baseline_sha.exists()
+    assert baseline_json.exists()
+

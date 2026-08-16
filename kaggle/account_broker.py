@@ -8,16 +8,19 @@ Critical security component. Raw credentials NEVER appear in:
 - MCP tool responses
 """
 
-import json
-import os
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Optional, Dict, List, Any
-from dataclasses import dataclass, field
+import atexit
+from contextlib import contextmanager
+from dataclasses import dataclass
 from enum import Enum
+import json
 import logging
+import os
+from pathlib import Path
+import shutil
+import signal
+import tempfile
 import time
+from typing import Any, Dict, Generator, List, Optional
 
 from kaggle.state_store import KaggleStateStore
 
@@ -35,6 +38,7 @@ class AccountStatus(Enum):
 @dataclass
 class KaggleAccount:
     """Account metadata. API key is NEVER stored here."""
+
     account_id: str
     username: str
     status: AccountStatus = AccountStatus.AVAILABLE
@@ -47,6 +51,7 @@ class KaggleAccount:
 @dataclass
 class RotationPolicy:
     """Policy gate for account rotation."""
+
     rotation_permitted: bool = True
     max_rotations_per_task: int = 3
     current_rotations: int = 0
@@ -66,15 +71,69 @@ class RotationPolicy:
 class AccountBroker:
     """Manages Kaggle account credentials with SQLite durable state and policy-aware rotation."""
 
-    def __init__(self, credentials_dir: str = "credentials/", rotation_policy: Optional[RotationPolicy] = None, db_path: Optional[str] = None):
+    def __init__(
+        self,
+        credentials_dir: str = "credentials/",
+        rotation_policy: Optional[RotationPolicy] = None,
+        db_path: Optional[str] = None,
+    ):
         self.credentials_dir = Path(credentials_dir)
         db_file = db_path or str(self.credentials_dir / "kaggle_state.db")
         self.state_store = KaggleStateStore(db_path=db_file)
         self.rotation_policy = rotation_policy or RotationPolicy()
         self._active_config_dirs: Dict[str, str] = {}  # account_id -> temp dir path
+
+        # Register cleanup hooks
+        self._register_lifecycle_cleanups()
+
+        # Startup cleanup: purge stale temporary auth directories from previous aborted runs
+        self.cleanup_stale_temp_dirs()
+
+        # Sync accounts & recover orphans
         self._load_and_sync_accounts()
-        # Recover orphaned jobs on broker boot
         self.state_store.recover_orphaned_jobs()
+
+    def _register_lifecycle_cleanups(self) -> None:
+        """Register atexit and signal handlers to guarantee temporary directory deletion."""
+        atexit.register(self.cleanup_all)
+
+        # Handle termination signals where available
+        for sig_name in ("SIGINT", "SIGTERM"):
+            if hasattr(signal, sig_name):
+                try:
+                    sig = getattr(signal, sig_name)
+                    prev_handler = signal.getsignal(sig)
+
+                    def make_handler(old_h):
+                        def _handler(signum, frame):
+                            self.cleanup_all()
+                            if callable(old_h):
+                                old_h(signum, frame)
+
+                        return _handler
+
+                    signal.signal(sig, make_handler(prev_handler))
+                except (ValueError, OSError):
+                    # Signal registration can fail if not in main thread; ignore safely
+                    pass
+
+    def cleanup_stale_temp_dirs(self) -> int:
+        """Remove any leftover kaggle_* temporary authentication directories from prior runs."""
+        cleaned = 0
+        tmp_dir = Path(tempfile.gettempdir())
+        try:
+            for p in tmp_dir.glob("kaggle_*"):
+                if p.is_dir():
+                    try:
+                        shutil.rmtree(str(p), ignore_errors=True)
+                        cleaned += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        if cleaned > 0:
+            logger.info("Purged %d stale Kaggle temporary auth directories on startup", cleaned)
+        return cleaned
 
     def _load_and_sync_accounts(self) -> None:
         """Load account metadata from config and synchronize with SQLite store."""
@@ -86,10 +145,10 @@ class AccountBroker:
         try:
             with open(accounts_file) as f:
                 data = json.load(f)
-            
+
             raw_accounts = data.get("accounts", [])
             self.state_store.sync_accounts(raw_accounts)
-            
+
             # Sync rotation policy from SQLite
             rot_data = self.state_store.get_rotation_policy()
             if rot_data:
@@ -108,11 +167,13 @@ class AccountBroker:
             result[acc["account_id"]] = KaggleAccount(
                 account_id=acc["account_id"],
                 username=acc["username"],
-                status=AccountStatus(acc["status"]) if acc["status"] in [s.value for s in AccountStatus] else AccountStatus.AVAILABLE,
+                status=AccountStatus(acc["status"])
+                if acc["status"] in [s.value for s in AccountStatus]
+                else AccountStatus.AVAILABLE,
                 last_used=acc["last_used"],
                 active_kernels=acc["active_kernels"],
                 max_concurrent=acc["max_concurrent"],
-                total_submissions=acc["total_submissions"]
+                total_submissions=acc["total_submissions"],
             )
         return result
 
@@ -130,7 +191,8 @@ class AccountBroker:
                 raise RuntimeError(f"Account {account_id} is {account.status.value}")
         else:
             available = [
-                a for a in current_accounts.values()
+                a
+                for a in current_accounts.values()
                 if a.status in (AccountStatus.AVAILABLE, AccountStatus.IN_USE) and a.active_kernels < a.max_concurrent
             ]
             if not available:
@@ -139,10 +201,7 @@ class AccountBroker:
 
         # Update SQLite store
         self.state_store.update_account_usage(
-            account_id=account.account_id,
-            delta_kernels=1,
-            delta_submissions=1,
-            status=AccountStatus.IN_USE.value
+            account_id=account.account_id, delta_kernels=1, delta_submissions=1, status=AccountStatus.IN_USE.value
         )
         logger.info("Selected Kaggle account: %s", account.account_id)
         return self.accounts[account.account_id]
@@ -153,14 +212,14 @@ class AccountBroker:
             logger.warning(
                 "Account rotation BLOCKED by policy. Rotations: %d/%d",
                 self.rotation_policy.current_rotations,
-                self.rotation_policy.max_rotations_per_task
+                self.rotation_policy.max_rotations_per_task,
             )
             return None
 
         if self.rotation_policy.needs_human_approval():
             logger.warning(
                 "Account rotation requires human approval after %d rotations",
-                self.rotation_policy.require_human_approval_after
+                self.rotation_policy.require_human_approval_after,
             )
             return None
 
@@ -175,7 +234,7 @@ class AccountBroker:
                 failed_account_id,
                 next_account.account_id,
                 self.rotation_policy.current_rotations,
-                self.rotation_policy.max_rotations_per_task
+                self.rotation_policy.max_rotations_per_task,
             )
             return next_account
         except RuntimeError:
@@ -184,11 +243,7 @@ class AccountBroker:
 
     def release_account(self, account_id: str) -> None:
         """Release account back to available pool and update SQLite store."""
-        self.state_store.update_account_usage(
-            account_id=account_id,
-            delta_kernels=-1,
-            delta_submissions=0
-        )
+        self.state_store.update_account_usage(account_id=account_id, delta_kernels=-1, delta_submissions=0)
         # Check if active is 0 to mark available
         acc = self.accounts.get(account_id)
         if acc and acc.active_kernels == 0 and acc.status == AccountStatus.IN_USE:
@@ -216,17 +271,26 @@ class AccountBroker:
         self._active_config_dirs[account_id] = config_dir
         return {"KAGGLE_CONFIG_DIR": config_dir}
 
+    @contextmanager
+    def authenticated_session(self, account_id: str) -> Generator[Dict[str, str], None, None]:
+        """Context manager guaranteeing temporary directory cleanup upon exit or exception."""
+        auth_env = self.setup_auth_env(account_id)
+        try:
+            yield auth_env
+        finally:
+            self._cleanup_config_dir(account_id)
+
     def _cleanup_config_dir(self, account_id: str) -> None:
         if account_id in self._active_config_dirs:
             config_dir = self._active_config_dirs.pop(account_id)
             try:
-                shutil.rmtree(config_dir)
+                shutil.rmtree(config_dir, ignore_errors=True)
                 logger.debug("Cleaned up config dir for %s", account_id)
             except OSError:
                 pass
 
     def get_status(self) -> Dict[str, Any]:
-        """Return status of all accounts without exposing credentials."""
+        """Return status of all accounts without exposing credentials or internal paths."""
         current_accounts = self.accounts.values()
         return {
             "accounts": [
@@ -243,9 +307,10 @@ class AccountBroker:
                 "rotation_permitted": self.rotation_policy.rotation_permitted,
                 "current_rotations": self.rotation_policy.current_rotations,
                 "max_rotations": self.rotation_policy.max_rotations_per_task,
-            }
+            },
         }
 
     def cleanup_all(self) -> None:
+        """Purge all active temporary config directories."""
         for account_id in list(self._active_config_dirs.keys()):
             self._cleanup_config_dir(account_id)

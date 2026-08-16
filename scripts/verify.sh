@@ -65,6 +65,9 @@ docker run --rm \
   -v "$PROJECT_ROOT/src:/workspace/src:ro" \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
+  -v "$PROJECT_ROOT/kaggle:/workspace/kaggle:ro" \
+  -v "$PROJECT_ROOT/mcp_servers:/workspace/mcp_servers:ro" \
+  -v "$PROJECT_ROOT/scripts:/workspace/scripts:ro" \
   "$SANDBOX_IMAGE" \
   mypy src/ --ignore-missing-imports --cache-dir /tmp/.mypy_cache
 record $?
@@ -79,6 +82,9 @@ docker run --rm \
   -v "$PROJECT_ROOT/src:/workspace/src:ro" \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
+  -v "$PROJECT_ROOT/kaggle:/workspace/kaggle:ro" \
+  -v "$PROJECT_ROOT/mcp_servers:/workspace/mcp_servers:ro" \
+  -v "$PROJECT_ROOT/scripts:/workspace/scripts:ro" \
   "$SANDBOX_IMAGE" \
   ruff check src/ tests/ --cache-dir /tmp/.ruff_cache
 record $?
@@ -93,17 +99,24 @@ docker run --rm \
   -v "$PROJECT_ROOT/src:/workspace/src:ro" \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
+  -v "$PROJECT_ROOT/kaggle:/workspace/kaggle:ro" \
+  -v "$PROJECT_ROOT/mcp_servers:/workspace/mcp_servers:ro" \
+  -v "$PROJECT_ROOT/scripts:/workspace/scripts:ro" \
   "$SANDBOX_IMAGE" \
   pytest tests/ -v --tb=short -o cache_dir=/tmp/.pytest_cache
 record $?
 
-# Step 5: Real Before/After Git Tree Diff Verification
-step 5 "Real Git Tree Diff Verification (Agent Turn Baseline)"
+# Step 5: Real Mandatory Git Tree Diff Verification
+step 5 "Real Git Tree Diff Verification (Mandatory Agent Baseline)"
 BASELINE_FILE=".state/tree_baseline.sha"
 
-if [ -f "$BASELINE_FILE" ]; then
+if [ ! -f "$BASELINE_FILE" ]; then
+  echo "  ❌ REJECTED: Mandatory turn baseline missing at $BASELINE_FILE"
+  echo "  The state machine must capture and persist a baseline before implementation/verification."
+  record 1
+else
   BASE_SHA=$(cat "$BASELINE_FILE" | tr -d '[:space:]')
-  echo "  Comparing working tree against agent baseline: $BASE_SHA"
+  echo "  Comparing working tree against mandatory turn baseline: $BASE_SHA"
   DIFF_COUNT=$(git diff --name-only "$BASE_SHA" 2>/dev/null | wc -l || echo "0")
   STATUS_COUNT=$(git status --porcelain | wc -l)
   TOTAL_CHANGES=$((DIFF_COUNT + STATUS_COUNT))
@@ -115,21 +128,6 @@ if [ -f "$BASELINE_FILE" ]; then
     echo "  ✅ Real tree diff verified ($TOTAL_CHANGES modifications detected)"
     record 0
   fi
-elif [ "$REQUIRE_DIFF" -eq 1 ]; then
-  STATUS_COUNT=$(git status --porcelain | wc -l)
-  DIFF_STAT=$(git diff --stat HEAD 2>/dev/null || echo "")
-  if [ "$STATUS_COUNT" -eq 0 ] && [ -z "$DIFF_STAT" ]; then
-    echo "  ❌ REJECTED: --require-diff specified but working tree shows ZERO changes"
-    record 1
-  else
-    echo "  ✅ Non-empty tree diff verified"
-    record 0
-  fi
-else
-  STATUS_COUNT=$(git status --porcelain | wc -l)
-  echo "  Working tree modifications count: $STATUS_COUNT"
-  git diff --stat HEAD~1 2>/dev/null || true
-  record 0
 fi
 
 # Step 6: Artifact verification
