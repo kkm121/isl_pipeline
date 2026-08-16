@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-LABEL purpose="controlled-integration"
-LABEL network="allowlisted"
+LABEL purpose="remote-integration-runner"
+LABEL network="standard-bridge"
 
 WORKDIR /workspace
 
@@ -16,7 +16,8 @@ COPY src/ src/
 COPY kaggle/ kaggle/
 COPY scripts/ scripts/
 
-# Credentials are mounted at runtime, never baked in
-# docker run -v /path/to/creds:/workspace/credentials:ro
+# Security Notice:
+# Credentials are NEVER mounted into or baked into this image.
+# Authenticated operations flow strictly through the host-side AccountBroker.
 
 ENTRYPOINT ["/bin/bash"]

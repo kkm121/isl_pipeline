@@ -67,7 +67,11 @@ class Trainer:
         }
 
         checkpoint_dir = getattr(self.training_config, "checkpoint_dir", "checkpoints/")
-        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        try:
+            Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.training_config.checkpoint_dir = "/tmp/checkpoints"
+            Path(self.training_config.checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     def _check_nan(self, loss: torch.Tensor) -> bool:
         return bool(torch.isnan(loss).any().item() or torch.isinf(loss).any().item())

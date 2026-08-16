@@ -8,6 +8,16 @@ cd "$PROJECT_ROOT"
 
 PASS=0
 FAIL=0
+REQUIRE_DIFF=0
+
+for arg in "$@"; do
+  case $arg in
+    --require-diff)
+      REQUIRE_DIFF=1
+      shift
+      ;;
+  esac
+done
 
 step() {
   echo ""
@@ -56,7 +66,7 @@ docker run --rm \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
   "$SANDBOX_IMAGE" \
-  mypy src/ --ignore-missing-imports
+  mypy src/ --ignore-missing-imports --cache-dir /tmp/.mypy_cache
 record $?
 
 # Step 3: Lint check (ruff) inside sealed container
@@ -70,7 +80,7 @@ docker run --rm \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
   "$SANDBOX_IMAGE" \
-  ruff check src/ tests/
+  ruff check src/ tests/ --cache-dir /tmp/.ruff_cache
 record $?
 
 # Step 4: Unit / Integration tests inside sealed container
@@ -84,19 +94,41 @@ docker run --rm \
   -v "$PROJECT_ROOT/tests:/workspace/tests:ro" \
   -v "$PROJECT_ROOT/configs:/workspace/configs:ro" \
   "$SANDBOX_IMAGE" \
-  pytest tests/ -v --tb=short
+  pytest tests/ -v --tb=short -o cache_dir=/tmp/.pytest_cache
 record $?
 
-# Step 5: Real Git Tree Diff Verification
-step 5 "HEAD / Git Tree Diff Verification"
-DIFF_COUNT=$(git status --porcelain | wc -l)
-echo "  Working tree modifications count: $DIFF_COUNT"
-if [ -n "$(git log -1 --oneline 2>/dev/null || true)" ]; then
-  echo "  Current commit: $(git rev-parse --short HEAD)"
-  git diff --stat HEAD~1 2>/dev/null || echo "  (Root commit inspection)"
-  record 0
+# Step 5: Real Before/After Git Tree Diff Verification
+step 5 "Real Git Tree Diff Verification (Agent Turn Baseline)"
+BASELINE_FILE=".state/tree_baseline.sha"
+
+if [ -f "$BASELINE_FILE" ]; then
+  BASE_SHA=$(cat "$BASELINE_FILE" | tr -d '[:space:]')
+  echo "  Comparing working tree against agent baseline: $BASE_SHA"
+  DIFF_COUNT=$(git diff --name-only "$BASE_SHA" 2>/dev/null | wc -l || echo "0")
+  STATUS_COUNT=$(git status --porcelain | wc -l)
+  TOTAL_CHANGES=$((DIFF_COUNT + STATUS_COUNT))
+  echo "  Files changed since turn baseline: $DIFF_COUNT (dirty working tree: $STATUS_COUNT)"
+  if [ "$TOTAL_CHANGES" -eq 0 ]; then
+    echo "  ❌ REJECTED: Expected agent modifications produced ZERO diff against baseline ($BASE_SHA)"
+    record 1
+  else
+    echo "  ✅ Real tree diff verified ($TOTAL_CHANGES modifications detected)"
+    record 0
+  fi
+elif [ "$REQUIRE_DIFF" -eq 1 ]; then
+  STATUS_COUNT=$(git status --porcelain | wc -l)
+  DIFF_STAT=$(git diff --stat HEAD 2>/dev/null || echo "")
+  if [ "$STATUS_COUNT" -eq 0 ] && [ -z "$DIFF_STAT" ]; then
+    echo "  ❌ REJECTED: --require-diff specified but working tree shows ZERO changes"
+    record 1
+  else
+    echo "  ✅ Non-empty tree diff verified"
+    record 0
+  fi
 else
-  echo "  Git repository initialized with tracked changes."
+  STATUS_COUNT=$(git status --porcelain | wc -l)
+  echo "  Working tree modifications count: $STATUS_COUNT"
+  git diff --stat HEAD~1 2>/dev/null || true
   record 0
 fi
 

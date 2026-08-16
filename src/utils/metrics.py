@@ -7,7 +7,11 @@ class MetricsTracker:
     def __init__(self, log_dir: str = "logs/local", experiment_name: str = "default"):
         self.log_dir = Path(log_dir)
         self.experiment_name = experiment_name
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.log_dir = Path("/tmp/logs/local")
+            self.log_dir.mkdir(parents=True, exist_ok=True)
         self.history: Dict[str, Dict[str, List[Tuple[int, float]]]] = {}
         self.metrics: Dict[str, List[float]] = {}  # key -> list of values
         self.file_path = self.log_dir / f"{experiment_name}_metrics.json"

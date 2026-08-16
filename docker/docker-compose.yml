@@ -18,35 +18,30 @@ services:
     security_opt:
       - no-new-privileges
 
-  # 2. Integration Runner: Controlled Outbound Integration for Remote APIs (Kaggle CLI, GitHub CLI)
+  # 2. Integration Runner: Standard Bridge Network for Remote CLI/API orchestration
+  # Note: Credentials are NEVER mounted into the container. Authenticated operations are performed
+  # strictly via the host Account Broker / MCP process.
   integration:
     build:
       context: ..
       dockerfile: docker/Dockerfile.integration
     networks:
-      - controlled-egress
+      - host-bridge
     volumes:
       - ../src:/workspace/src:ro
       - ../kaggle:/workspace/kaggle:ro
       - ../scripts:/workspace/scripts:ro
-      - ../credentials:/workspace/credentials:ro
       - integration-results:/workspace/results
     security_opt:
       - no-new-privileges
     environment:
-      # Outbound destinations are restricted to authorized endpoints:
-      # - api.github.com / github.com
-      # - www.kaggle.com / api.kaggle.com
-      - KAGGLE_CONFIG_DIR=/workspace/credentials
       - HTTPS_PROXY=${INTEGRATION_HTTPS_PROXY:-}
       - HTTP_PROXY=${INTEGRATION_HTTP_PROXY:-}
 
 networks:
-  # Bridge network with egress proxy / routing control for external APIs
-  controlled-egress:
+  # Standard Docker bridge network (outbound access for remote APIs; does not provide automated IP allowlisting)
+  host-bridge:
     driver: bridge
-    driver_opts:
-      com.docker.network.bridge.enable_icc: "false"
 
 volumes:
   sandbox-results:

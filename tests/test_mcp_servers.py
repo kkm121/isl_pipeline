@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+from kaggle.account_broker import AccountBroker
+from kaggle.kernel_manager import KernelManager
 from kaggle.state_store import KaggleStateStore
 from mcp_servers.filesystem_mcp import (
     validate_path,
@@ -13,7 +15,7 @@ from mcp_servers.linter_test_mcp import (
     run_mypy,
     run_pytest,
 )
-from scripts import safety_check
+from scripts import auto_format, safety_check
 from src.orchestrator.state_machine import (
     HumanGateException,
     InvalidTransitionError,
@@ -22,7 +24,7 @@ from src.orchestrator.state_machine import (
 )
 
 # ==============================================================================
-# 1. Safety Checker Fail-Closed & Rule Verification
+# 1. Safety Checker & Auto-Format Hook Validation
 # ==============================================================================
 
 
@@ -65,6 +67,19 @@ def test_safety_check_fails_closed_on_invalid_json(monkeypatch):
     res = json.loads(out.getvalue())
     assert res["decision"] == "deny"
     assert "Fail-closed" in res["reason"]
+
+
+def test_auto_format_rejects_path_traversal():
+    res = auto_format.format_file("../../../etc/shadow.py")
+    assert res["status"] == "rejected"
+    assert "traversal or outside boundary" in res["error"]
+
+
+def test_auto_format_validates_safe_python_file():
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        res = auto_format.format_file("src/models/config.py")
+        assert res["status"] == "formatted"
 
 
 # ==============================================================================
@@ -146,11 +161,15 @@ def test_kaggle_sqlite_durability_and_account_release(tmp_path):
         ]
     )
 
-    # Record submission
-    store.record_job_submission("user1/test-kernel", "kaggle_1")
+    # Record submission (submitting -> queued)
+    store.reserve_and_record_submitting("user1/test-kernel", "kaggle_1")
     acc = store.get_account("kaggle_1")
     assert acc["active_kernels"] == 1
     assert acc["status"] == "in_use"
+
+    store.mark_job_queued("user1/test-kernel")
+    job = store.get_job("user1/test-kernel")
+    assert job["status"] == "queued"
 
     # Re-instantiate store (simulating MCP restart)
     store2 = KaggleStateStore(db_path=str(db_file))
@@ -165,24 +184,60 @@ def test_kaggle_sqlite_durability_and_account_release(tmp_path):
     assert acc_after["status"] == "available"
 
 
-def test_kaggle_orphan_job_recovery(tmp_path):
-    db_file = tmp_path / "test_recovery.db"
+def test_kaggle_crashed_submission_recovery(tmp_path):
+    db_file = tmp_path / "test_crash_recovery.db"
     store = KaggleStateStore(db_path=str(db_file))
     store.sync_accounts([{"account_id": "kaggle_1", "username": "user1"}])
 
-    # Simulate an active job, then mark it terminal
-    store.record_job_submission("user1/job1", "kaggle_1")
-    store.update_job_status("user1/job1", "error")
-
-    # Force corrupt active_kernels to simulate abnormal crash
-    with store._get_conn() as conn:
-        conn.execute("UPDATE accounts SET active_kernels = 3 WHERE account_id = 'kaggle_1'")
-        conn.commit()
-
-    recovered = store.recover_orphaned_jobs()
-    assert recovered == 1
+    # Job reserved in 'submitting' state but process died before completing remote push
+    store.reserve_and_record_submitting("user1/crashed-job", "kaggle_1")
     acc = store.get_account("kaggle_1")
-    assert acc["active_kernels"] == 0
+    assert acc["active_kernels"] == 1
+
+    # Startup recovery cleans up crashed submitting job and releases account
+    recovered = store.recover_orphaned_jobs()
+    assert recovered >= 1
+    acc_after = store.get_account("kaggle_1")
+    assert acc_after["active_kernels"] == 0
+    job = store.get_job("user1/crashed-job")
+    assert job["status"] == "failed"
+
+
+def test_kaggle_cancel_remote_execution(tmp_path):
+    creds_dir = tmp_path / "credentials"
+    creds_dir.mkdir()
+    (creds_dir / "kaggle_accounts.json").write_text(
+        json.dumps({"accounts": [{"account_id": "kaggle_1", "username": "user1"}]})
+    )
+    (creds_dir / "kaggle_1.json").write_text(json.dumps({"username": "user1", "key": "secret"}))
+
+    broker = AccountBroker(credentials_dir=str(creds_dir), db_path=str(creds_dir / "test_state.db"))
+    manager = KernelManager(broker=broker, project_root=str(tmp_path))
+
+    broker.state_store.reserve_and_record_submitting("user1/kernel_to_cancel", "kaggle_1")
+    broker.state_store.mark_job_queued("user1/kernel_to_cancel")
+
+    # Mock remote failure
+    with patch.object(manager, "_run_kaggle_cmd") as mock_cmd:
+        mock_cmd.return_value = subprocess.CompletedProcess(
+            args=[], returncode=1, stdout="", stderr="Kernel not running or not found"
+        )
+        res = manager.cancel("user1/kernel_to_cancel")
+        assert res["status"] == "error"
+        assert not res["remote_success"]
+        # Account should not be marked cancelled if remote call failed
+        assert broker.state_store.get_job("user1/kernel_to_cancel")["status"] == "queued"
+
+    # Mock remote success
+    with patch.object(manager, "_run_kaggle_cmd") as mock_cmd:
+        mock_cmd.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="Kernel 'user1/kernel_to_cancel' cancelled successfully.", stderr=""
+        )
+        res = manager.cancel("user1/kernel_to_cancel")
+        assert res["status"] == "cancelled"
+        assert res["remote_success"]
+        assert broker.state_store.get_job("user1/kernel_to_cancel")["status"] == "cancelled"
+        assert broker.accounts["kaggle_1"].active_kernels == 0
 
 
 # ==============================================================================

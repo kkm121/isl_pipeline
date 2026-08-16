@@ -132,7 +132,11 @@ class PipelineStateMachine:
     ):
         self.retry_policy = retry_policy or RetryPolicy()
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.log_dir = Path("/tmp/logs/agents")
+            self.log_dir.mkdir(parents=True, exist_ok=True)
         self.project_root = Path(project_root).resolve()
         self.current_state = PipelineState.IDLE
         self.transition_history: list[StateTransition] = []
