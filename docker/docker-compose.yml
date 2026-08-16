@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 1. Sealed Sandbox Runner: Strictly Offline, Zero Network Access
   sandbox:
     build:
       context: ..
@@ -17,23 +18,35 @@ services:
     security_opt:
       - no-new-privileges
 
+  # 2. Integration Runner: Controlled Outbound Integration for Remote APIs (Kaggle CLI, GitHub CLI)
   integration:
     build:
       context: ..
       dockerfile: docker/Dockerfile.integration
     networks:
-      - allowlisted
+      - controlled-egress
     volumes:
-      - ../src:/workspace/src
-      - ../kaggle:/workspace/kaggle
-      - ../scripts:/workspace/scripts
+      - ../src:/workspace/src:ro
+      - ../kaggle:/workspace/kaggle:ro
+      - ../scripts:/workspace/scripts:ro
+      - ../credentials:/workspace/credentials:ro
       - integration-results:/workspace/results
-    dns:
-      - 8.8.8.8
+    security_opt:
+      - no-new-privileges
+    environment:
+      # Outbound destinations are restricted to authorized endpoints:
+      # - api.github.com / github.com
+      # - www.kaggle.com / api.kaggle.com
+      - KAGGLE_CONFIG_DIR=/workspace/credentials
+      - HTTPS_PROXY=${INTEGRATION_HTTPS_PROXY:-}
+      - HTTP_PROXY=${INTEGRATION_HTTP_PROXY:-}
 
 networks:
-  allowlisted:
+  # Bridge network with egress proxy / routing control for external APIs
+  controlled-egress:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
 
 volumes:
   sandbox-results:

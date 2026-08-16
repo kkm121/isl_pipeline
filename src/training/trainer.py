@@ -6,34 +6,59 @@ from pathlib import Path
 import json
 import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import math
 
 from src.models.classifier import ISLClassifier
-from src.models.config import PipelineConfig
+from src.models.config import PipelineConfig, TrainingConfig
 from src.utils.metrics import MetricsTracker
 
 logger = logging.getLogger(__name__)
 
 class Trainer:
-    def __init__(self, model: ISLClassifier, config: PipelineConfig, device: str):
-        self.model = model.to(device)
-        self.config = config
-        self.device = device
+    def __init__(self, model: ISLClassifier, datamodule_or_config: Any = None, config_or_device: Any = None, device: str = "cpu"):
+        self.datamodule = None
+        if hasattr(datamodule_or_config, "get_dataloaders"):
+            self.datamodule = datamodule_or_config
+            raw_cfg = config_or_device
+        else:
+            raw_cfg = datamodule_or_config
+
+        if isinstance(raw_cfg, PipelineConfig):
+            self.config = raw_cfg
+            self.training_config = raw_cfg.training
+        elif isinstance(raw_cfg, TrainingConfig):
+            self.training_config = raw_cfg
+            self.config = None
+        else:
+            self.training_config = TrainingConfig()
+            self.config = None
+
+        dev = device if isinstance(device, str) else "cpu"
+        if isinstance(config_or_device, str):
+            dev = config_or_device
+
+        self.device = dev
+        self.model = model.to(self.device)
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), 
-            lr=config.training.learning_rate, 
-            weight_decay=config.training.weight_decay
+            lr=self.training_config.learning_rate, 
+            weight_decay=self.training_config.weight_decay
         )
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             self.optimizer, 
-            T_max=config.training.epochs
+            T_max=max(self.training_config.epochs, 1)
         )
         self.criterion = nn.CrossEntropyLoss()
-        self.scaler = GradScaler(enabled=config.training.mixed_precision)
+        self.scaler = GradScaler(enabled=self.training_config.mixed_precision and torch.cuda.is_available())
         
-        self.metrics = MetricsTracker(config.training.log_dir, config.experiment_name)
-        Path(config.training.checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        log_dir = getattr(self.training_config, "log_dir", "logs/local")
+        exp_name = getattr(self.config, "experiment_name", "default") if self.config else "default"
+        self.metrics = MetricsTracker(log_dir, exp_name)
+        self.history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
+        
+        checkpoint_dir = getattr(self.training_config, "checkpoint_dir", "checkpoints/")
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
 
     def _check_nan(self, loss: torch.Tensor) -> bool:
         return torch.isnan(loss).any().item() or torch.isinf(loss).any().item()
@@ -56,24 +81,21 @@ class Trainer:
             x, y = x.to(self.device), y.to(self.device)
             self.optimizer.zero_grad()
             
-            with autocast(enabled=self.config.training.mixed_precision):
+            with autocast(enabled=self.training_config.mixed_precision and torch.cuda.is_available()):
                 outputs = self.model(x)
                 loss = self.criterion(outputs, y)
                 
             if self._check_nan(loss):
-                logger.warning("NaN loss detected. Skipping batch.")
-                continue
+                raise RuntimeError("NaN loss encountered during training")
                 
             self.scaler.scale(loss).backward()
             
             self.scaler.unscale_(self.optimizer)
             grad_norm = self._get_grad_norm()
             if math.isnan(grad_norm) or math.isinf(grad_norm):
-                 logger.warning("NaN gradient detected. Skipping batch.")
-                 self.optimizer.zero_grad()
-                 continue
+                 raise RuntimeError("NaN gradient encountered during training")
                  
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.training.gradient_clip)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.training_config.gradient_clip)
             self.scaler.step(self.optimizer)
             self.scaler.update()
             
@@ -110,21 +132,42 @@ class Trainer:
         }
 
     def _save_checkpoint(self, epoch: int, metrics: Dict, is_best: bool = False):
-        ckpt_path = Path(self.config.training.checkpoint_dir) / f"{self.config.experiment_name}_latest.pth"
-        self.model.save(str(ckpt_path))
+        ckpt_dir = getattr(self.training_config, "checkpoint_dir", "checkpoints/")
+        exp_name = getattr(self.config, "experiment_name", "default") if self.config else "default"
+        ckpt_path = Path(ckpt_dir) / f"{exp_name}_latest.pt"
+        if hasattr(self.model, "save"):
+            self.model.save(str(ckpt_path))
+        else:
+            torch.save(self.model.state_dict(), str(ckpt_path))
+            
         if is_best:
-            best_path = Path(self.config.training.checkpoint_dir) / f"{self.config.experiment_name}_best.pth"
-            self.model.save(str(best_path))
+            best_path = Path(ckpt_dir) / f"{exp_name}_best.pt"
+            if hasattr(self.model, "save"):
+                self.model.save(str(best_path))
+            else:
+                torch.save(self.model.state_dict(), str(best_path))
 
-    def train(self, train_loader: DataLoader, val_loader: DataLoader) -> Dict[str, Any]:
+    def train(self, train_loader: Optional[DataLoader] = None, val_loader: Optional[DataLoader] = None) -> Dict[str, Any]:
+        if train_loader is None or val_loader is None:
+            if self.datamodule is not None:
+                train_loader, val_loader, _ = self.datamodule.get_dataloaders(self.training_config.batch_size)
+            else:
+                raise ValueError("Must provide train_loader and val_loader or initialize Trainer with datamodule")
+
         best_val_loss = float('inf')
         patience_counter = 0
+        epochs = self.training_config.epochs
         
-        for epoch in range(1, self.config.training.epochs + 1):
+        for epoch in range(1, epochs + 1):
             t0 = time.time()
             train_metrics = self._train_epoch(train_loader)
             val_metrics = self._validate(val_loader)
             self.scheduler.step()
+            
+            self.history['train_loss'].append(train_metrics['loss'])
+            self.history['train_acc'].append(train_metrics['accuracy'])
+            self.history['val_loss'].append(val_metrics['loss'])
+            self.history['val_acc'].append(val_metrics['accuracy'])
             
             self.metrics.log(epoch, train_metrics, 'train')
             self.metrics.log(epoch, val_metrics, 'val')
@@ -138,16 +181,13 @@ class Trainer:
                 
             self._save_checkpoint(epoch, val_metrics, is_best)
             
-            logger.info(f"Epoch {epoch}/{self.config.training.epochs} - {time.time()-t0:.1f}s")
-            logger.info(f"Train: Loss {train_metrics['loss']:.4f} Acc {train_metrics['accuracy']:.4f}")
-            logger.info(f"Val: Loss {val_metrics['loss']:.4f} Acc {val_metrics['accuracy']:.4f}")
-            
-            if patience_counter >= self.config.training.patience:
+            if patience_counter >= self.training_config.patience:
                 logger.info(f"Early stopping at epoch {epoch}")
                 break
                 
         self.metrics.save()
         return {
             'best_val_loss': best_val_loss,
-            'epochs_trained': epoch
+            'epochs_trained': epoch,
+            'history': self.history
         }

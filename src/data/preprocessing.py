@@ -82,7 +82,9 @@ def flatten_landmarks(landmarks: np.ndarray) -> np.ndarray:
     shape = landmarks.shape
     return landmarks.reshape(shape[:-2] + (-1,))
 
-def augment_landmarks(landmarks: np.ndarray, noise_std: float = 0.01, scale_range: tuple = (0.9, 1.1)) -> np.ndarray:
+def augment_landmarks(landmarks: np.ndarray, noise_std: float = 0.01, scale_range: tuple = (0.9, 1.1), p: float = 1.0) -> np.ndarray:
+    if np.random.rand() > p:
+        return landmarks.copy()
     noise = np.random.normal(0, noise_std, landmarks.shape)
     scale = np.random.uniform(scale_range[0], scale_range[1])
     return (landmarks * scale) + noise

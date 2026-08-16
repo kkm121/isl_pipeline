@@ -13,10 +13,11 @@ class Attention(nn.Module):
         super().__init__()
         self.attention = nn.Linear(hidden_size, 1)
 
-    def forward(self, lstm_output: torch.Tensor) -> torch.Tensor:
+    def forward(self, lstm_output: torch.Tensor):
         # lstm_output: (batch, seq_len, hidden_size)
         weights = torch.softmax(self.attention(lstm_output), dim=1) # (batch, seq_len, 1)
-        return torch.sum(weights * lstm_output, dim=1) # (batch, hidden_size)
+        context = torch.sum(weights * lstm_output, dim=1) # (batch, hidden_size)
+        return context, weights
 
 class ISLClassifier(nn.Module):
     def __init__(self, config: ModelConfig):
@@ -54,7 +55,7 @@ class ISLClassifier(nn.Module):
         out, _ = self.lstm(x)
         
         if self.config.attention:
-            out = self.attention(out)
+            out, _ = self.attention(out)
         else:
             out = out[:, -1, :]
             

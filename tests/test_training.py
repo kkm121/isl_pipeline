@@ -31,12 +31,14 @@ def test_trainer_one_epoch(configs, datamodule, tmp_path):
     assert len(trainer.history['train_loss']) > 0
 
 def test_trainer_loss_decreases(configs, datamodule, tmp_path):
-    configs.training.epochs = 5
+    configs.training.epochs = 15
+    configs.training.learning_rate = 0.05
     configs.training.checkpoint_dir = str(tmp_path)
     model = ISLClassifier(configs.model)
     trainer = Trainer(model, datamodule, configs.training)
     trainer.train()
     history = trainer.history['train_loss']
+    assert len(history) == 15
     assert history[0] > history[-1]
 
 def test_trainer_checkpoint_saved(configs, datamodule, tmp_path):

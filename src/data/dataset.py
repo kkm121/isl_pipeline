@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from pathlib import Path
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Any
 import json
 import logging
 
@@ -12,10 +12,10 @@ from src.models.config import DataConfig
 logger = logging.getLogger(__name__)
 
 class ISLDataset(Dataset):
-    def __init__(self, sequences: np.ndarray, labels: np.ndarray, config: DataConfig, augment: bool = False):
-        self.sequences = sequences
-        self.labels = labels
-        self.config = config
+    def __init__(self, sequences: Any, labels: Any, config: Optional[DataConfig] = None, augment: bool = False):
+        self.sequences = np.array(sequences)
+        self.labels = np.array(labels)
+        self.config = config or DataConfig()
         self.augment = augment
 
     def __len__(self):
@@ -89,14 +89,31 @@ class ISLDataModule:
         
         return train_ds, val_ds, test_ds
 
-    def get_dataloaders(self, batch_size: int, num_workers: int = 0) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    def get_dataloaders(self, batch_size: int = 32, num_workers: int = 0) -> Tuple[DataLoader, DataLoader, DataLoader]:
         train_ds, val_ds, test_ds = self.split()
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
         val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return train_loader, val_loader, test_loader
 
-    def create_synthetic(self, n_samples: int = 100) -> Tuple[ISLDataset, ISLDataset, ISLDataset]:
-        self.sequences = np.random.randn(n_samples, self.config.sequence_length, 21, 3)
-        self.labels = np.random.randint(0, self.config.num_classes, n_samples)
-        return self.split()
+    def train_dataloader(self, batch_size: int = 32) -> DataLoader:
+        train_ds, _, _ = self.split()
+        return DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+
+    def val_dataloader(self, batch_size: int = 32) -> DataLoader:
+        _, val_ds, _ = self.split()
+        return DataLoader(val_ds, batch_size=batch_size, shuffle=False)
+
+    def test_dataloader(self, batch_size: int = 32) -> DataLoader:
+        _, _, test_ds = self.split()
+        return DataLoader(test_ds, batch_size=batch_size, shuffle=False)
+
+    def create_synthetic(self, n_samples: int = 100, num_samples: Optional[int] = None) -> Tuple[ISLDataset, ISLDataset, ISLDataset]:
+        total_samples = num_samples if num_samples is not None else n_samples
+        self.sequences = np.random.randn(total_samples, self.config.sequence_length, 21, 3)
+        self.labels = np.random.randint(0, self.config.num_classes, total_samples)
+        train_ds, val_ds, test_ds = self.split()
+        self.train_dataset = train_ds
+        self.val_dataset = val_ds
+        self.test_dataset = test_ds
+        return train_ds, val_ds, test_ds

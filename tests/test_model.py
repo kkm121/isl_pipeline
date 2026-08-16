@@ -74,6 +74,7 @@ def test_classifier_count_parameters(model_config):
 
 def test_classifier_save_load(model_config, tmp_path):
     model = ISLClassifier(model_config)
+    model.eval()
     x = torch.rand(4, 10, 63)
     out1 = model(x)
     
@@ -82,6 +83,7 @@ def test_classifier_save_load(model_config, tmp_path):
     
     model2 = ISLClassifier(model_config)
     model2.load_state_dict(torch.load(path))
+    model2.eval()
     out2 = model2(x)
     
     torch.testing.assert_close(out1, out2)

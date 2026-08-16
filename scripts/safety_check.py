@@ -35,7 +35,16 @@ def check_command(command: str) -> dict:
 
 def main():
     try:
-        payload = json.load(sys.stdin)
+        raw_input = sys.stdin.read().strip()
+        if not raw_input:
+            json.dump({'decision': 'deny', 'reason': 'Fail-closed: empty input received by safety checker'}, sys.stdout)
+            sys.exit(1)
+            
+        payload = json.loads(raw_input)
+        if not isinstance(payload, dict):
+            json.dump({'decision': 'deny', 'reason': 'Fail-closed: payload is not a valid JSON object'}, sys.stdout)
+            sys.exit(1)
+            
         tool_name = payload.get('toolName', '')
         tool_args = payload.get('toolArgs', {})
         
@@ -46,8 +55,12 @@ def main():
             result = {'decision': 'allow'}
         
         json.dump(result, sys.stdout)
+        if result.get('decision') == 'deny':
+            sys.exit(1)
     except Exception as e:
-        json.dump({'decision': 'allow', 'warning': str(e)}, sys.stdout)
+        # FAIL-CLOSED: Any exception or error in the safety checker must deny the operation
+        json.dump({'decision': 'deny', 'reason': f'Fail-closed: safety checker exception: {str(e)}'}, sys.stdout)
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

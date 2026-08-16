@@ -1,12 +1,22 @@
+"""Deterministic State Machine Controller for Autonomous Agent Pipelines.
+
+Enforces rigid transitions, explicit HUMAN_GATE escalations, hard retry limits,
+before/after Git tree diff verification, and config mutation limits.
+The LLM does NOT decide the state transitions; this controller does.
+"""
+
 from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Callable, List
+from typing import Optional, Dict, Any, Callable, List, Tuple
 import time
 import json
+import subprocess
 import logging
 from pathlib import Path
+import yaml
 
 logger = logging.getLogger(__name__)
+
 
 class PipelineState(Enum):
     IDLE = auto()
@@ -23,6 +33,7 @@ class PipelineState(Enum):
     FAILED = auto()
     COMPLETE = auto()
 
+
 class HumanGateReason(Enum):
     UNCERTAIN_DIAGNOSIS = auto()
     DESTRUCTIVE_OPERATION = auto()
@@ -32,14 +43,28 @@ class HumanGateReason(Enum):
     POLICY_VIOLATION = auto()  # e.g. ToS concerns
     MAX_RETRIES_EXCEEDED = auto()
     RESOURCE_BUDGET_EXCEEDED = auto()
+    CONFIG_MUTATION_LIMIT_EXCEEDED = auto()
+    ZERO_DIFF_FAILURE = auto()
+
+
+class InvalidTransitionError(Exception):
+    """Raised when an illegal state transition is attempted."""
+    pass
+
+
+class HumanGateException(Exception):
+    """Raised when an operation triggers an automatic escalation to HUMAN_GATE."""
+    pass
+
 
 @dataclass
 class StateTransition:
     from_state: PipelineState
     to_state: PipelineState
     timestamp: float
-    evidence: Dict[str, Any]  # what triggered the transition
-    agent: str  # which agent provided the evidence
+    evidence: Dict[str, Any]
+    agent: str
+
 
 @dataclass
 class RetryPolicy:
@@ -48,12 +73,12 @@ class RetryPolicy:
     max_config_mutations: int = 3
     current_retries: int = 0
     current_config_mutations: int = 0
-    failure_signatures: Dict[str, int] = field(default_factory=dict)  # signature -> count
+    failure_signatures: Dict[str, int] = field(default_factory=dict)
 
-class InvalidTransitionError(Exception):
-    pass
 
 class PipelineStateMachine:
+    """Rigid state machine with programmatic transition enforcement."""
+
     ALLOWED_TRANSITIONS = {
         PipelineState.IDLE: [PipelineState.SPECIFICATION],
         PipelineState.SPECIFICATION: [PipelineState.TEST_PLAN, PipelineState.HUMAN_GATE],
@@ -65,30 +90,125 @@ class PipelineStateMachine:
         PipelineState.INDEPENDENT_REVIEW: [PipelineState.ACCEPT, PipelineState.RETRY, PipelineState.HUMAN_GATE],
         PipelineState.ACCEPT: [PipelineState.COMPLETE],
         PipelineState.RETRY: [PipelineState.IMPLEMENTATION, PipelineState.STATIC_VERIFY, PipelineState.HUMAN_GATE, PipelineState.FAILED],
-        PipelineState.HUMAN_GATE: [], # terminal
-        PipelineState.FAILED: [], # terminal
+        PipelineState.HUMAN_GATE: [],  # terminal: requires manual intervention
+        PipelineState.FAILED: [],      # terminal
         PipelineState.COMPLETE: [PipelineState.IDLE]
     }
 
-    def __init__(self, retry_policy: Optional[RetryPolicy] = None, log_dir: str = 'logs/agents/'):
+    def __init__(self, retry_policy: Optional[RetryPolicy] = None, log_dir: str = 'logs/agents/', project_root: str = '.'):
         self.retry_policy = retry_policy or RetryPolicy()
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.project_root = Path(project_root).resolve()
         self.current_state = PipelineState.IDLE
         self.transition_history: List[StateTransition] = []
+        self._tree_baseline: Optional[Dict[str, Any]] = None
+
+    def capture_tree_baseline(self) -> Dict[str, Any]:
+        """Capture the Git tree baseline state before an implementation or remediation turn."""
+        try:
+            head_proc = subprocess.run(
+                ['git', 'rev-parse', 'HEAD'],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            head_sha = head_proc.stdout.strip() if head_proc.returncode == 0 else "unknown"
+
+            status_proc = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            status_output = status_proc.stdout.strip()
+
+            self._tree_baseline = {
+                "head_sha": head_sha,
+                "status_lines": status_output.splitlines() if status_output else [],
+                "timestamp": time.time()
+            }
+            logger.info("Captured Git tree baseline: HEAD=%s, dirty_files=%d", head_sha, len(self._tree_baseline["status_lines"]))
+            return self._tree_baseline
+        except Exception as e:
+            logger.warning("Could not capture Git tree baseline: %s", str(e))
+            self._tree_baseline = {"head_sha": "none", "status_lines": [], "timestamp": time.time()}
+            return self._tree_baseline
+
+    def verify_git_diff(self, expected_modifications: bool = True) -> Tuple[bool, Dict[str, Any]]:
+        """Perform real before/after Git tree diff verification.
+        
+        If expected_modifications=True and the diff is zero, rejects and flags failure.
+        """
+        try:
+            status_proc = subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            current_status = status_proc.stdout.strip().splitlines() if status_proc.stdout.strip() else []
+
+            diff_proc = subprocess.run(
+                ['git', 'diff', '--stat'],
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            diff_stat = diff_proc.stdout.strip()
+
+            baseline_status = set(self._tree_baseline.get("status_lines", [])) if self._tree_baseline else set()
+            new_changes = set(current_status) - baseline_status
+
+            has_changes = bool(new_changes) or bool(diff_stat)
+
+            details = {
+                "has_changes": has_changes,
+                "diff_stat": diff_stat,
+                "changed_files": list(new_changes) or current_status,
+                "baseline_head": self._tree_baseline.get("head_sha") if self._tree_baseline else None
+            }
+
+            if expected_modifications and not has_changes:
+                logger.error("DIFF_VERIFY failed: Expected modifications but Git working tree shows ZERO diff.")
+                return False, {
+                    "error": "Zero diff detected: Agent claimed modifications but no actual file changes were recorded.",
+                    **details
+                }
+
+            return True, details
+        except Exception as e:
+            logger.error("Error during Git diff verification: %s", str(e))
+            return False, {"error": f"Git diff verification exception: {str(e)}"}
 
     def transition(self, target: PipelineState, evidence: Dict[str, Any], agent: str) -> bool:
+        """Execute a state transition with deterministic boundary checks."""
         allowed = self.ALLOWED_TRANSITIONS.get(self.current_state, [])
         if target not in allowed:
-            raise InvalidTransitionError(f"Cannot transition from {self.current_state} to {target}")
+            raise InvalidTransitionError(f"Cannot transition from {self.current_state.name} to {target.name}")
 
         actual_target = target
-        if target == PipelineState.RETRY:
+
+        # Handle Diff Verification automatically if entering DIFF_VERIFY
+        if target == PipelineState.DIFF_VERIFY:
+            diff_ok, diff_details = self.verify_git_diff(expected_modifications=evidence.get("expected_changes", True))
+            evidence["diff_verification"] = diff_details
+            if not diff_ok:
+                logger.warning("Diff verification failed. Transitioning to RETRY.")
+                self.record_failure("zero_diff_error", diff_details)
+                actual_target = PipelineState.RETRY
+
+        # Handle RETRY checks
+        if actual_target == PipelineState.RETRY:
             self.retry_policy.current_retries += 1
             if reason := self.check_retry_limits():
-                logger.warning(f"Retry limits exceeded ({reason}), forcing transition to HUMAN_GATE.")
+                logger.warning(f"Retry limits exceeded ({reason.name}), forcing transition to HUMAN_GATE.")
                 actual_target = PipelineState.HUMAN_GATE
-                evidence["forced_reason"] = reason.name
+                evidence["forced_human_gate_reason"] = reason.name
 
         transition_record = StateTransition(
             from_state=self.current_state,
@@ -101,18 +221,92 @@ class PipelineStateMachine:
         self.current_state = actual_target
         return True
 
+    def mutate_config(self, config_path: str, mutation_data: Dict[str, Any], reason: str, agent: str = "ml-ops") -> Dict[str, Any]:
+        """Apply an autonomous configuration mutation with strict limit enforcement."""
+        if self.retry_policy.current_config_mutations >= self.retry_policy.max_config_mutations:
+            error_msg = (
+                f"Config mutation limit exceeded ({self.retry_policy.current_config_mutations}/"
+                f"{self.retry_policy.max_config_mutations}). Halting autonomous changes."
+            )
+            logger.critical(error_msg)
+            # Force transition to HUMAN_GATE
+            if self.current_state in self.ALLOWED_TRANSITIONS and PipelineState.HUMAN_GATE in self.ALLOWED_TRANSITIONS[self.current_state]:
+                self.transition(
+                    PipelineState.HUMAN_GATE,
+                    {"reason": error_msg, "mutation_attempted": mutation_data},
+                    agent=agent
+                )
+            else:
+                self.current_state = PipelineState.HUMAN_GATE
+            raise HumanGateException(error_msg)
+
+        # Apply mutation safely
+        target_file = Path(config_path)
+        if not target_file.is_absolute():
+            target_file = self.project_root / config_path
+
+        if not target_file.exists():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        # Read existing config
+        with open(target_file, 'r') as f:
+            if target_file.suffix in ('.yaml', '.yml'):
+                content = yaml.safe_load(f) or {}
+            else:
+                content = json.load(f) or {}
+
+        # Merge updates
+        def deep_update(d, u):
+            for k, v in u.items():
+                if isinstance(v, dict) and isinstance(d.get(k), dict):
+                    deep_update(d[k], v)
+                else:
+                    d[k] = v
+
+        deep_update(content, mutation_data)
+
+        # Write back
+        with open(target_file, 'w') as f:
+            if target_file.suffix in ('.yaml', '.yml'):
+                yaml.safe_dump(content, f, sort_keys=False)
+            else:
+                json.dump(content, f, indent=2)
+
+        self.retry_policy.current_config_mutations += 1
+        logger.info(
+            "Config mutated (%d/%d): %s (Reason: %s)",
+            self.retry_policy.current_config_mutations,
+            self.retry_policy.max_config_mutations,
+            config_path,
+            reason
+        )
+
+        return {
+            "status": "mutated",
+            "mutations_used": self.retry_policy.current_config_mutations,
+            "max_mutations": self.retry_policy.max_config_mutations,
+            "updated_config": content
+        }
+
     def record_failure(self, signature: str, details: Dict):
+        """Track failure signatures to detect repetitive loops."""
         count = self.retry_policy.failure_signatures.get(signature, 0) + 1
         self.retry_policy.failure_signatures[signature] = count
-        if count >= 2:
-            logger.warning(f"Repeated failure signature: {signature}. May trigger HUMAN_GATE.")
+        if count >= self.retry_policy.max_retries_per_failure:
+            logger.warning(
+                "Repeated failure signature '%s' reached limit (%d/%d).",
+                signature, count, self.retry_policy.max_retries_per_failure
+            )
 
     def check_retry_limits(self) -> Optional[HumanGateReason]:
+        """Check if any retry or loop limit is exceeded."""
         if self.retry_policy.current_retries > self.retry_policy.max_total_retries:
             return HumanGateReason.MAX_RETRIES_EXCEEDED
         for sig, count in self.retry_policy.failure_signatures.items():
             if count >= self.retry_policy.max_retries_per_failure:
                 return HumanGateReason.REPEATED_FAILURE
+        if self.retry_policy.current_config_mutations >= self.retry_policy.max_config_mutations:
+            return HumanGateReason.CONFIG_MUTATION_LIMIT_EXCEEDED
         return None
 
     def get_state(self) -> PipelineState:
@@ -174,3 +368,4 @@ class PipelineStateMachine:
         self.retry_policy.current_retries = 0
         self.retry_policy.current_config_mutations = 0
         self.retry_policy.failure_signatures.clear()
+        self._tree_baseline = None
