@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+LABEL purpose="controlled-integration"
+LABEL network="allowlisted"
+
+WORKDIR /workspace
+
+# Install integration tools
+RUN pip install --no-cache-dir kaggle gh
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e .
+
+# Copy source and Kaggle tools
+COPY src/ src/
+COPY kaggle/ kaggle/
+COPY scripts/ scripts/
+
+# Credentials are mounted at runtime, never baked in
+# docker run -v /path/to/creds:/workspace/credentials:ro
+
+ENTRYPOINT ["/bin/bash"]

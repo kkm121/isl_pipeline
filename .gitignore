@@ -1,0 +1,53 @@
+# Credentials and Secrets
+credentials/
+.env
+.env.local
+
+# Project specific directories
+checkpoints/
+logs/
+metrics/
+experiments/
+results/
+
+# Python caching and compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging and distribution
+*.egg-info/
+dist/
+build/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Type checking, linting, and testing caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Model weights and serialized files
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# Kaggle metadata and integration
+*.kaggle/
+
+# Docker
+# Docker build cache should be ignored if applicable.
+.docker/
+
+# NOTE: Do NOT exclude .agents/ (those are committed)
+!/.agents/

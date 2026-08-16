@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+LABEL purpose="sealed-sandbox"
+LABEL network="none"
+
+WORKDIR /workspace
+
+# Install testing and linting tools
+COPY pyproject.toml .
+RUN pip install --no-cache-dir pytest mypy ruff
+
+# Copy source code
+COPY src/ src/
+COPY tests/ tests/
+COPY configs/ configs/
+
+# This container runs with --network=none
+# No internet access for generated code execution
+ENTRYPOINT ["python", "-m"]
+CMD ["pytest", "tests/", "-v"]

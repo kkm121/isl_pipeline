@@ -1,0 +1,14 @@
+{
+  "id": "USERNAME/isl-pipeline-training",
+  "title": "ISL Pipeline Training",
+  "code_file": "train_kernel.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

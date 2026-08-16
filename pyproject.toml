@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isl-pipeline"
+version = "0.1.0"
+description = "Indian Sign Language recognition pipeline with autonomous ML engineering architecture"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "torchvision",
+    "mediapipe",
+    "opencv-python",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "pyyaml",
+    "tqdm",
+    "tensorboard"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "mypy",
+    "ruff",
+    "fastmcp"
+]
+
+[project.scripts]
+isl_pipeline = "src.inference.predict:main"

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "isl-filesystem": {
+      "command": "python",
+      "args": ["mcp_servers/filesystem_mcp.py"]
+    },
+    "isl-linter-test": {
+      "command": "python",
+      "args": ["mcp_servers/linter_test_mcp.py"]
+    },
+    "isl-kaggle-manager": {
+      "command": "python",
+      "args": ["mcp_servers/kaggle_manager_mcp.py"]
+    },
+    "isl-github": {
+      "command": "python",
+      "args": ["mcp_servers/github_mcp.py"]
+    }
+  }
+}

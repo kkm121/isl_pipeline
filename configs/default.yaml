@@ -1,0 +1,35 @@
+# ISL Pipeline — Default Configuration
+
+experiment_name: default
+
+data:
+  data_dir: data/
+  num_landmarks: 21
+  landmark_dim: 3
+  sequence_length: 30
+  num_classes: 26
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  random_seed: 42
+
+model:
+  input_size: 63
+  hidden_size: 256
+  num_layers: 2
+  dropout: 0.3
+  bidirectional: true
+  attention: true
+  num_classes: 26
+
+training:
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 100
+  patience: 15
+  gradient_clip: 1.0
+  mixed_precision: true
+  checkpoint_dir: checkpoints/
+  log_dir: logs/local/
+  device: auto
