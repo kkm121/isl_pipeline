@@ -9,25 +9,28 @@ ISL Pipeline is an autonomous ML engineering project for Indian Sign Language re
 3. **Execution Plane** — Isolated Docker containers + remote Kaggle GPU
 4. **Verification Plane** — Deterministic state machine with mandatory gates
 
-## Model-Agnostic Design (Correction #1)
+## Model Allocation & Dynamic Reasoning Tiers
 
-The architecture is **model-agnostic** at the infrastructure layer. The Principal Engineer role is filled by whichever model the user configures.
+The architecture utilizes a tiered, high-capability model distribution with dynamic reasoning levels:
 
-- **Current selection**: Claude Opus 4.6
-- **The infrastructure does NOT assume** any specific model's capabilities
-- **All model interaction** flows through the MCP tool layer
+| Role | Primary Model | Reasoning Level | Fallback Hierarchy (on Limit Exhaustion) | Key Responsibilities |
+|---|---|---|---|---|
+| **Principal Engineer** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | System architecture, specification gates, delegation |
+| **Independent Reviewer** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | Clean-session adversarial review, diff verification |
+| **ML-Ops Specialist** | **Gemini 3.1 Pro** | **Medium-High** | Gemini 3.7 Flash → Gemini 3.6 Flash | Kaggle GPU lifecycle, OOM diagnostics, config mutation |
+| **Test Engineer** | **Gemini 3.7 Flash** | **Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | TDD test suite generation, sealed Docker verification |
+| **Researcher** | **Gemini 3.7 Flash** | **Low-Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Codebase indexing, doc search, dependency analysis |
 
-## Agent Roles with Least-Privilege Permissions (Correction #15)
+### Dynamic Reasoning Levels
+- **High Reasoning**: Deep architectural planning, mathematical modeling, specification invariants, and adversarial code reviews.
+- **Medium Reasoning**: GPU fault diagnostics, test plan edge-case generation, state transition validation.
+- **Low Reasoning**: Code grep/search, fast log analysis, AST navigation, documentation retrieval.
 
-| Agent | Model | Permissions | Tools |
-|---|---|---|---|
-| Principal Engineer | Configurable (current: Opus 4.6) | Full orchestration | All MCP servers, state machine |
-| Researcher | Fast model (read-only) | Read-only codebase access | Filesystem MCP (read), web search |
-| Test Engineer | Fast model | Test execution only | Linter/Test MCP, Filesystem MCP |
-| Reviewer | Configurable (current: Opus 4.6) | Read-only + diff | Filesystem MCP (read), GitHub MCP (diff) |
-| ML-Ops | Pro model | Kaggle execution only | Kaggle Manager MCP |
-
-**Least privilege**: Each agent gets ONLY the tools it needs. Researcher and Reviewer are read-only.
+### Graceful Fallback Policy
+When any model reaches its rate limit or subscription window quota:
+1. The orchestrator automatically cascades down to the next designated fallback tier.
+2. If falling back to a lighter model (e.g. from Opus to 3.1 Pro or 3.7 Flash), the reasoning effort is dynamically adjusted up to preserve output quality.
+3. State machine transitions and gate enforcement remain unchanged and strictly deterministic across all model tiers.
 
 ## Deterministic State Machine (Correction #4)
 
