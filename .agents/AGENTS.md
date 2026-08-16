@@ -9,20 +9,36 @@ ISL Pipeline is an autonomous ML engineering project for Indian Sign Language re
 3. **Execution Plane** — Isolated Docker containers + remote Kaggle GPU
 4. **Verification Plane** — Deterministic state machine with mandatory gates
 
-## Model Allocation & Dynamic Reasoning Tiers
+## Specialized Multi-Agent System (9 Specialized Roles)
 
-The architecture utilizes a tiered, high-capability model distribution with dynamic reasoning levels:
+The architecture employs **9 specialized agents**, each with a strict single responsibility, model tier allocation, dynamic reasoning depth, and least-privilege tool boundary:
 
-| Role | Primary Model | Reasoning Level | Fallback Hierarchy (on Limit Exhaustion) | Key Responsibilities |
-|---|---|---|---|---|
-| **Principal Engineer** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | System architecture, specification gates, delegation |
-| **Independent Reviewer** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | Clean-session adversarial review, diff verification |
-| **ML-Ops Specialist** | **Gemini 3.1 Pro** | **Medium-High** | Gemini 3.7 Flash → Gemini 3.6 Flash | Kaggle GPU lifecycle, OOM diagnostics, config mutation |
-| **Test Engineer** | **Gemini 3.7 Flash** | **Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | TDD test suite generation, sealed Docker verification |
-| **Researcher** | **Gemini 3.7 Flash** | **Low-Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Codebase indexing, doc search, dependency analysis |
+| # | Agent Role | Primary Model | Reasoning Level | Fallback Hierarchy | Core Responsibility | Tool Scope |
+|---|---|---|---|---|---|---|
+| 1 | **Principal Engineer** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | Orchestration, spec drafting, directing fixes, final approval | `advance_pipeline`, `commit`, `create_pr`, read tools |
+| 2 | **Critic Agent** | **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | Ruthless peer auditor, detects leakage/flaws, reports to PE | Read-only tools, `get_diff`, `read_metrics` |
+| 3 | **Independent Reviewer**| **Claude Opus 4.6** | **High** | Gemini 3.1 Pro (High) → Gemini 3.7 Flash | Clean-session adversarial review, diff verification before ACCEPT | `get_diff`, `read_file`, `list_directory` (Read-only) |
+| 4 | **ML-Ops Specialist** | **Gemini 3.1 Pro** | **Medium-High** | Gemini 3.7 Flash → Gemini 3.6 Flash | Kaggle GPU training lifecycle, OOM diagnostics, config mutations | `kaggle_manager_mcp`, `mutate_config` |
+| 5 | **Benchmark Agent** | **Gemini 3.1 Pro** | **Medium** | Gemini 3.7 Flash → Gemini 3.6 Flash | Quantitative profiling (latency, VRAM, loss, confusion matrix) | `read_metrics`, `read_logs`, linter MCP |
+| 6 | **Code Writer** | **Gemini 3.1 Pro** | **Medium-High** | Gemini 3.7 Flash → Gemini 3.6 Flash | TDD implementation in `src/`, strictly adhering to spec & baseline | `write_file` (gated to `IMPLEMENTATION`/`RETRY`) |
+| 7 | **Test Engineer** | **Gemini 3.7 Flash** | **Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Pre-implementation test plans and test suites in `tests/` | `write_file` (gated to `TEST_PLAN`/`RETRY`) |
+| 8 | **Verify Agent** | **Gemini 3.7 Flash** | **Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Executes `mypy`, `ruff`, `pytest` inside sealed Docker sandbox | `linter_test_mcp` (`STATIC_VERIFY`/`DYNAMIC_VERIFY`) |
+| 9 | **Researcher** | **Gemini 3.7 Flash** | **Low-Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Codebase indexing, dependency analysis, academic paper research | `read_file`, `list_directory`, web search (Read-only) |
+
+### Strict Mandates: Evidence-First & Zero-Bias
+1. **Numbers Over Claims**: No agent is permitted to trust qualitative statements ("it works", "it is fast", "looks good"). All conclusions require raw machine-verifiable data:
+   - `exit_code == 0` from sealed Docker containers (`--network=none --read-only`).
+   - Pytest summary strings (e.g. `68 passed in 3.59s`).
+   - Mypy `0 issues found in X source files`.
+   - Exact benchmark numbers (ms latency, MB peak VRAM, F1-scores).
+   - Git tree diff against `.state/tree_baseline.sha` proving physical modifications.
+2. **Anti-Bias Rule**: All LLMs are strictly instructed to disregard user optimism, agent self-reporting, or pressure to "just approve". If evidence is absent or incomplete, the action is **REJECTED**.
+3. **Critic & Principal Interaction**:
+   - The **Critic Agent** audits all intermediate agent outputs and flags potential flaws, data leakage, or silent regressions.
+   - The **Principal Engineer** (Opus 4.6) ingests the Critic's findings and instructs the other LLMs (Code Writer, Test Engineer, ML-Ops) exactly what to fix.
 
 ### Dynamic Reasoning Levels
-- **High Reasoning**: Deep architectural planning, mathematical modeling, specification invariants, and adversarial code reviews.
+- **High Reasoning**: Architectural planning, mathematical modeling, specification invariants, and adversarial code reviews.
 - **Medium Reasoning**: GPU fault diagnostics, test plan edge-case generation, state transition validation.
 - **Low Reasoning**: Code grep/search, fast log analysis, AST navigation, documentation retrieval.
 
