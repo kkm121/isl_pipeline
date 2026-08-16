@@ -26,8 +26,22 @@ dev = [
     "pytest",
     "mypy",
     "ruff",
-    "fastmcp"
+    "fastmcp",
+    "types-PyYAML"
 ]
 
 [project.scripts]
 isl_pipeline = "src.inference.predict:main"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_configs = true

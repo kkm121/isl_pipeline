@@ -1,11 +1,10 @@
-import numpy as np
-from typing import Optional
-from pathlib import Path
-import json
 import logging
+
 import cv2
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
 
 class LandmarkExtractor:
     def __init__(self, static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5):
@@ -19,17 +18,18 @@ class LandmarkExtractor:
         if self.mp_hands is None:
             try:
                 import mediapipe as mp
+
                 self.mp_hands = mp.solutions.hands
                 self.hands = self.mp_hands.Hands(
                     static_image_mode=self.static_image_mode,
                     max_num_hands=self.max_num_hands,
-                    min_detection_confidence=self.min_detection_confidence
+                    min_detection_confidence=self.min_detection_confidence,
                 )
             except ImportError:
                 logger.error("MediaPipe not installed.")
                 raise
 
-    def extract_from_frame(self, frame: np.ndarray) -> Optional[np.ndarray]:
+    def extract_from_frame(self, frame: np.ndarray) -> np.ndarray | None:
         self._init_mediapipe()
         results = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         if results.multi_hand_landmarks:
@@ -60,6 +60,7 @@ class LandmarkExtractor:
             self.hands.close()
             self.hands = None
 
+
 def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
     if landmarks.size == 0:
         return landmarks
@@ -68,6 +69,7 @@ def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
     max_val = np.max(np.abs(centered), axis=(-2, -1), keepdims=True)
     max_val[max_val == 0] = 1.0
     return centered / max_val
+
 
 def pad_sequence(sequence: np.ndarray, target_length: int, pad_value: float = 0.0) -> np.ndarray:
     t = sequence.shape[0]
@@ -78,11 +80,18 @@ def pad_sequence(sequence: np.ndarray, target_length: int, pad_value: float = 0.
     padding = np.full(pad_shape, pad_value)
     return np.concatenate([sequence, padding], axis=0)
 
+
 def flatten_landmarks(landmarks: np.ndarray) -> np.ndarray:
     shape = landmarks.shape
     return landmarks.reshape(shape[:-2] + (-1,))
 
-def augment_landmarks(landmarks: np.ndarray, noise_std: float = 0.01, scale_range: tuple = (0.9, 1.1), p: float = 1.0) -> np.ndarray:
+
+def augment_landmarks(
+    landmarks: np.ndarray,
+    noise_std: float = 0.01,
+    scale_range: tuple = (0.9, 1.1),
+    p: float = 1.0,
+) -> np.ndarray:
     if np.random.rand() > p:
         return landmarks.copy()
     noise = np.random.normal(0, noise_std, landmarks.shape)

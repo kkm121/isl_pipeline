@@ -1,9 +1,9 @@
-from dataclasses import dataclass
-from typing import Optional, Dict
-import time
 import logging
+import time
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ResourceBudget:
@@ -17,8 +17,9 @@ class ResourceBudget:
     max_concurrent_agents: int = 5
     max_concurrent_kaggle_jobs: int = 2
 
+
 class ResourceTracker:
-    def __init__(self, budget: Optional[ResourceBudget] = None):
+    def __init__(self, budget: ResourceBudget | None = None):
         self.budget = budget or ResourceBudget()
         self.start_time = time.time()
         self.usage = {
@@ -29,10 +30,10 @@ class ResourceTracker:
             "container_memory_mb": 0.0,
             "container_cpu_cores": 0.0,
             "concurrent_agents": 0,
-            "concurrent_kaggle_jobs": 0
+            "concurrent_kaggle_jobs": 0,
         }
 
-    def _get_limit(self, resource: str) -> Optional[float]:
+    def _get_limit(self, resource: str) -> float | None:
         attr_name = f"max_{resource}"
         if hasattr(self.budget, attr_name):
             return getattr(self.budget, attr_name)
@@ -57,11 +58,11 @@ class ResourceTracker:
         if resource in self.usage:
             self.usage[resource] = max(0.0, self.usage[resource] - amount)
 
-    def get_usage(self) -> Dict:
+    def get_usage(self) -> dict:
         return {
             "usage": dict(self.usage),
             "runtime_seconds": time.time() - self.start_time,
-            "budget": self.budget.__dict__
+            "budget": self.budget.__dict__,
         }
 
     def is_runtime_exceeded(self) -> bool:
@@ -72,5 +73,5 @@ class ResourceTracker:
             return max(0.0, self.budget.max_runtime_seconds - (time.time() - self.start_time))
         limit = self._get_limit(resource)
         if limit is None:
-            return float('inf')
+            return float("inf")
         return max(0.0, limit - self.usage.get(resource, 0))

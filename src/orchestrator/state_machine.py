@@ -5,14 +5,15 @@ before/after Git tree diff verification, and config mutation limits.
 The LLM does NOT decide the state transitions; this controller does.
 """
 
-from enum import Enum, auto
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Callable, List, Tuple
-import time
 import json
-import subprocess
 import logging
+import subprocess
+import time
+from dataclasses import dataclass, field
+from enum import Enum, auto
 from pathlib import Path
+from typing import Any
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -49,12 +50,10 @@ class HumanGateReason(Enum):
 
 class InvalidTransitionError(Exception):
     """Raised when an illegal state transition is attempted."""
-    pass
 
 
 class HumanGateException(Exception):
     """Raised when an operation triggers an automatic escalation to HUMAN_GATE."""
-    pass
 
 
 @dataclass
@@ -62,7 +61,7 @@ class StateTransition:
     from_state: PipelineState
     to_state: PipelineState
     timestamp: float
-    evidence: Dict[str, Any]
+    evidence: dict[str, Any]
     agent: str
 
 
@@ -73,7 +72,7 @@ class RetryPolicy:
     max_config_mutations: int = 3
     current_retries: int = 0
     current_config_mutations: int = 0
-    failure_signatures: Dict[str, int] = field(default_factory=dict)
+    failure_signatures: dict[str, int] = field(default_factory=dict)
 
 
 class PipelineStateMachine:
@@ -81,83 +80,126 @@ class PipelineStateMachine:
 
     ALLOWED_TRANSITIONS = {
         PipelineState.IDLE: [PipelineState.SPECIFICATION],
-        PipelineState.SPECIFICATION: [PipelineState.TEST_PLAN, PipelineState.HUMAN_GATE],
-        PipelineState.TEST_PLAN: [PipelineState.IMPLEMENTATION, PipelineState.HUMAN_GATE],
-        PipelineState.IMPLEMENTATION: [PipelineState.STATIC_VERIFY, PipelineState.HUMAN_GATE],
-        PipelineState.STATIC_VERIFY: [PipelineState.DYNAMIC_VERIFY, PipelineState.RETRY, PipelineState.HUMAN_GATE],
-        PipelineState.DYNAMIC_VERIFY: [PipelineState.DIFF_VERIFY, PipelineState.RETRY, PipelineState.HUMAN_GATE],
-        PipelineState.DIFF_VERIFY: [PipelineState.INDEPENDENT_REVIEW, PipelineState.RETRY, PipelineState.HUMAN_GATE],
-        PipelineState.INDEPENDENT_REVIEW: [PipelineState.ACCEPT, PipelineState.RETRY, PipelineState.HUMAN_GATE],
+        PipelineState.SPECIFICATION: [
+            PipelineState.TEST_PLAN,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.TEST_PLAN: [
+            PipelineState.IMPLEMENTATION,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.IMPLEMENTATION: [
+            PipelineState.STATIC_VERIFY,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.STATIC_VERIFY: [
+            PipelineState.DYNAMIC_VERIFY,
+            PipelineState.RETRY,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.DYNAMIC_VERIFY: [
+            PipelineState.DIFF_VERIFY,
+            PipelineState.RETRY,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.DIFF_VERIFY: [
+            PipelineState.INDEPENDENT_REVIEW,
+            PipelineState.RETRY,
+            PipelineState.HUMAN_GATE,
+        ],
+        PipelineState.INDEPENDENT_REVIEW: [
+            PipelineState.ACCEPT,
+            PipelineState.RETRY,
+            PipelineState.HUMAN_GATE,
+        ],
         PipelineState.ACCEPT: [PipelineState.COMPLETE],
-        PipelineState.RETRY: [PipelineState.IMPLEMENTATION, PipelineState.STATIC_VERIFY, PipelineState.HUMAN_GATE, PipelineState.FAILED],
+        PipelineState.RETRY: [
+            PipelineState.IMPLEMENTATION,
+            PipelineState.STATIC_VERIFY,
+            PipelineState.HUMAN_GATE,
+            PipelineState.FAILED,
+        ],
         PipelineState.HUMAN_GATE: [],  # terminal: requires manual intervention
-        PipelineState.FAILED: [],      # terminal
-        PipelineState.COMPLETE: [PipelineState.IDLE]
+        PipelineState.FAILED: [],  # terminal
+        PipelineState.COMPLETE: [PipelineState.IDLE],
     }
 
-    def __init__(self, retry_policy: Optional[RetryPolicy] = None, log_dir: str = 'logs/agents/', project_root: str = '.'):
+    def __init__(
+        self,
+        retry_policy: RetryPolicy | None = None,
+        log_dir: str = "logs/agents/",
+        project_root: str = ".",
+    ):
         self.retry_policy = retry_policy or RetryPolicy()
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.project_root = Path(project_root).resolve()
         self.current_state = PipelineState.IDLE
-        self.transition_history: List[StateTransition] = []
-        self._tree_baseline: Optional[Dict[str, Any]] = None
+        self.transition_history: list[StateTransition] = []
+        self._tree_baseline: dict[str, Any] | None = None
 
-    def capture_tree_baseline(self) -> Dict[str, Any]:
+    def capture_tree_baseline(self) -> dict[str, Any]:
         """Capture the Git tree baseline state before an implementation or remediation turn."""
         try:
             head_proc = subprocess.run(
-                ['git', 'rev-parse', 'HEAD'],
+                ["git", "rev-parse", "HEAD"],
                 cwd=str(self.project_root),
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             head_sha = head_proc.stdout.strip() if head_proc.returncode == 0 else "unknown"
 
             status_proc = subprocess.run(
-                ['git', 'status', '--porcelain'],
+                ["git", "status", "--porcelain"],
                 cwd=str(self.project_root),
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             status_output = status_proc.stdout.strip()
 
             self._tree_baseline = {
                 "head_sha": head_sha,
                 "status_lines": status_output.splitlines() if status_output else [],
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
-            logger.info("Captured Git tree baseline: HEAD=%s, dirty_files=%d", head_sha, len(self._tree_baseline["status_lines"]))
+            logger.info(
+                "Captured Git tree baseline: HEAD=%s, dirty_files=%d",
+                head_sha,
+                len(self._tree_baseline["status_lines"]),
+            )
             return self._tree_baseline
         except Exception as e:
             logger.warning("Could not capture Git tree baseline: %s", str(e))
-            self._tree_baseline = {"head_sha": "none", "status_lines": [], "timestamp": time.time()}
+            self._tree_baseline = {
+                "head_sha": "none",
+                "status_lines": [],
+                "timestamp": time.time(),
+            }
             return self._tree_baseline
 
-    def verify_git_diff(self, expected_modifications: bool = True) -> Tuple[bool, Dict[str, Any]]:
+    def verify_git_diff(self, expected_modifications: bool = True) -> tuple[bool, dict[str, Any]]:
         """Perform real before/after Git tree diff verification.
-        
+
         If expected_modifications=True and the diff is zero, rejects and flags failure.
         """
         try:
             status_proc = subprocess.run(
-                ['git', 'status', '--porcelain'],
+                ["git", "status", "--porcelain"],
                 cwd=str(self.project_root),
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             current_status = status_proc.stdout.strip().splitlines() if status_proc.stdout.strip() else []
 
             diff_proc = subprocess.run(
-                ['git', 'diff', '--stat'],
+                ["git", "diff", "--stat"],
                 cwd=str(self.project_root),
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             diff_stat = diff_proc.stdout.strip()
 
@@ -170,22 +212,22 @@ class PipelineStateMachine:
                 "has_changes": has_changes,
                 "diff_stat": diff_stat,
                 "changed_files": list(new_changes) or current_status,
-                "baseline_head": self._tree_baseline.get("head_sha") if self._tree_baseline else None
+                "baseline_head": self._tree_baseline.get("head_sha") if self._tree_baseline else None,
             }
 
             if expected_modifications and not has_changes:
                 logger.error("DIFF_VERIFY failed: Expected modifications but Git working tree shows ZERO diff.")
                 return False, {
                     "error": "Zero diff detected: Agent claimed modifications but no actual file changes were recorded.",
-                    **details
+                    **details,
                 }
 
             return True, details
         except Exception as e:
             logger.error("Error during Git diff verification: %s", str(e))
-            return False, {"error": f"Git diff verification exception: {str(e)}"}
+            return False, {"error": f"Git diff verification exception: {e!s}"}
 
-    def transition(self, target: PipelineState, evidence: Dict[str, Any], agent: str) -> bool:
+    def transition(self, target: PipelineState, evidence: dict[str, Any], agent: str) -> bool:
         """Execute a state transition with deterministic boundary checks."""
         allowed = self.ALLOWED_TRANSITIONS.get(self.current_state, [])
         if target not in allowed:
@@ -215,13 +257,19 @@ class PipelineStateMachine:
             to_state=actual_target,
             timestamp=time.time(),
             evidence=evidence,
-            agent=agent
+            agent=agent,
         )
         self.transition_history.append(transition_record)
         self.current_state = actual_target
         return True
 
-    def mutate_config(self, config_path: str, mutation_data: Dict[str, Any], reason: str, agent: str = "ml-ops") -> Dict[str, Any]:
+    def mutate_config(
+        self,
+        config_path: str,
+        mutation_data: dict[str, Any],
+        reason: str,
+        agent: str = "ml-ops",
+    ) -> dict[str, Any]:
         """Apply an autonomous configuration mutation with strict limit enforcement."""
         if self.retry_policy.current_config_mutations >= self.retry_policy.max_config_mutations:
             error_msg = (
@@ -230,11 +278,14 @@ class PipelineStateMachine:
             )
             logger.critical(error_msg)
             # Force transition to HUMAN_GATE
-            if self.current_state in self.ALLOWED_TRANSITIONS and PipelineState.HUMAN_GATE in self.ALLOWED_TRANSITIONS[self.current_state]:
+            if (
+                self.current_state in self.ALLOWED_TRANSITIONS
+                and PipelineState.HUMAN_GATE in self.ALLOWED_TRANSITIONS[self.current_state]
+            ):
                 self.transition(
                     PipelineState.HUMAN_GATE,
                     {"reason": error_msg, "mutation_attempted": mutation_data},
-                    agent=agent
+                    agent=agent,
                 )
             else:
                 self.current_state = PipelineState.HUMAN_GATE
@@ -249,8 +300,8 @@ class PipelineStateMachine:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         # Read existing config
-        with open(target_file, 'r') as f:
-            if target_file.suffix in ('.yaml', '.yml'):
+        with open(target_file, "r") as f:
+            if target_file.suffix in (".yaml", ".yml"):
                 content = yaml.safe_load(f) or {}
             else:
                 content = json.load(f) or {}
@@ -266,8 +317,8 @@ class PipelineStateMachine:
         deep_update(content, mutation_data)
 
         # Write back
-        with open(target_file, 'w') as f:
-            if target_file.suffix in ('.yaml', '.yml'):
+        with open(target_file, "w") as f:
+            if target_file.suffix in (".yaml", ".yml"):
                 yaml.safe_dump(content, f, sort_keys=False)
             else:
                 json.dump(content, f, indent=2)
@@ -278,27 +329,29 @@ class PipelineStateMachine:
             self.retry_policy.current_config_mutations,
             self.retry_policy.max_config_mutations,
             config_path,
-            reason
+            reason,
         )
 
         return {
             "status": "mutated",
             "mutations_used": self.retry_policy.current_config_mutations,
             "max_mutations": self.retry_policy.max_config_mutations,
-            "updated_config": content
+            "updated_config": content,
         }
 
-    def record_failure(self, signature: str, details: Dict):
+    def record_failure(self, signature: str, details: dict):
         """Track failure signatures to detect repetitive loops."""
         count = self.retry_policy.failure_signatures.get(signature, 0) + 1
         self.retry_policy.failure_signatures[signature] = count
         if count >= self.retry_policy.max_retries_per_failure:
             logger.warning(
                 "Repeated failure signature '%s' reached limit (%d/%d).",
-                signature, count, self.retry_policy.max_retries_per_failure
+                signature,
+                count,
+                self.retry_policy.max_retries_per_failure,
             )
 
-    def check_retry_limits(self) -> Optional[HumanGateReason]:
+    def check_retry_limits(self) -> HumanGateReason | None:
         """Check if any retry or loop limit is exceeded."""
         if self.retry_policy.current_retries > self.retry_policy.max_total_retries:
             return HumanGateReason.MAX_RETRIES_EXCEEDED
@@ -312,7 +365,7 @@ class PipelineStateMachine:
     def get_state(self) -> PipelineState:
         return self.current_state
 
-    def get_history(self) -> List[StateTransition]:
+    def get_history(self) -> list[StateTransition]:
         return self.transition_history
 
     def save_state(self, path: str):
@@ -324,8 +377,9 @@ class PipelineStateMachine:
                     "to_state": t.to_state.name,
                     "timestamp": t.timestamp,
                     "evidence": t.evidence,
-                    "agent": t.agent
-                } for t in self.transition_history
+                    "agent": t.agent,
+                }
+                for t in self.transition_history
             ],
             "retry_policy": {
                 "max_retries_per_failure": self.retry_policy.max_retries_per_failure,
@@ -333,14 +387,14 @@ class PipelineStateMachine:
                 "max_config_mutations": self.retry_policy.max_config_mutations,
                 "current_retries": self.retry_policy.current_retries,
                 "current_config_mutations": self.retry_policy.current_config_mutations,
-                "failure_signatures": self.retry_policy.failure_signatures
-            }
+                "failure_signatures": self.retry_policy.failure_signatures,
+            },
         }
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
 
     def load_state(self, path: str):
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             data = json.load(f)
         self.current_state = PipelineState[data["current_state"]]
         self.transition_history = [
@@ -349,8 +403,9 @@ class PipelineStateMachine:
                 to_state=PipelineState[t["to_state"]],
                 timestamp=t["timestamp"],
                 evidence=t["evidence"],
-                agent=t["agent"]
-            ) for t in data["history"]
+                agent=t["agent"],
+            )
+            for t in data["history"]
         ]
         rp = data["retry_policy"]
         self.retry_policy = RetryPolicy(
@@ -359,7 +414,7 @@ class PipelineStateMachine:
             max_config_mutations=rp["max_config_mutations"],
             current_retries=rp["current_retries"],
             current_config_mutations=rp["current_config_mutations"],
-            failure_signatures=rp["failure_signatures"]
+            failure_signatures=rp["failure_signatures"],
         )
 
     def reset(self):
