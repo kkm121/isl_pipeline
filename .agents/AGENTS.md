@@ -93,7 +93,7 @@ Raw tokens **NEVER** enter:
 ### Four Boundaries
 1. **Model boundary**: Agents see tools/resources/results, never raw credentials
 2. **Filesystem boundary**: Agents access ONLY the project directory
-3. **Network boundary**: Sealed sandbox (no network) / Integration runner (allowlisted) / Kaggle (remote)
+3. **Network boundary**: Sealed sandbox (no network) / Integration runner (controlled network) / Kaggle (remote)
 4. **Credential boundary**: All secrets through broker, never in context
 
 ## MCP-First Interaction

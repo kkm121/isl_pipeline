@@ -9,10 +9,14 @@ try:
 except ImportError:
     from fastmcp import FastMCP
 
+from src.orchestrator.gatekeeper import PipelineGate
+from src.orchestrator.state_machine import PipelineState
+
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP("isl-linter-test")
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+gate = PipelineGate(str(PROJECT_ROOT))
 
 SANDBOX_IMAGE = os.environ.get("ISL_SANDBOX_IMAGE", "isl-sandbox")
 
@@ -43,6 +47,12 @@ def run_in_docker_sandbox(cmd: list[str]) -> dict:
         f"{PROJECT_ROOT / 'tests'}:/workspace/tests:ro",
         "-v",
         f"{PROJECT_ROOT / 'configs'}:/workspace/configs:ro",
+        "-v",
+        f"{PROJECT_ROOT / 'kaggle'}:/workspace/kaggle:ro",
+        "-v",
+        f"{PROJECT_ROOT / 'mcp_servers'}:/workspace/mcp_servers:ro",
+        "-v",
+        f"{PROJECT_ROOT / 'scripts'}:/workspace/scripts:ro",
         SANDBOX_IMAGE,
     ] + cmd
 
@@ -83,7 +93,12 @@ def run_in_docker_sandbox(cmd: list[str]) -> dict:
 
 @mcp.tool()
 def run_pytest(test_path: str = "tests/", markers: str = "", verbose: bool = True) -> str:
-    """Run pytest inside the sealed ephemeral Docker sandbox (--network=none)."""
+    """Run pytest inside the sealed ephemeral Docker sandbox (--network=none).
+
+    Permitted exclusively during DYNAMIC_VERIFY state.
+    """
+    gate.require_state("verification.pytest", [PipelineState.DYNAMIC_VERIFY])
+
     cmd = ["pytest", test_path, "-o", "cache_dir=/tmp/.pytest_cache"]
     if markers:
         cmd.extend(["-m", markers])
@@ -102,14 +117,24 @@ def run_pytest(test_path: str = "tests/", markers: str = "", verbose: bool = Tru
 
 @mcp.tool()
 def run_mypy(target: str = "src/") -> str:
-    """Run mypy type checker inside the sealed ephemeral Docker sandbox."""
+    """Run mypy type checker inside the sealed ephemeral Docker sandbox.
+
+    Permitted exclusively during STATIC_VERIFY state.
+    """
+    gate.require_state("verification.mypy", [PipelineState.STATIC_VERIFY])
+
     cmd = ["mypy", "--ignore-missing-imports", "--cache-dir", "/tmp/.mypy_cache"] + target.split()
     return json.dumps(run_in_docker_sandbox(cmd))
 
 
 @mcp.tool()
 def run_ruff_check(target: str = "src/ tests/") -> str:
-    """Run ruff linter inside the sealed ephemeral Docker sandbox."""
+    """Run ruff linter inside the sealed ephemeral Docker sandbox.
+
+    Permitted exclusively during STATIC_VERIFY state.
+    """
+    gate.require_state("verification.ruff", [PipelineState.STATIC_VERIFY])
+
     cmd = ["ruff", "check", "--cache-dir", "/tmp/.ruff_cache"] + target.split()
     return json.dumps(run_in_docker_sandbox(cmd))
 
@@ -117,6 +142,11 @@ def run_ruff_check(target: str = "src/ tests/") -> str:
 @mcp.tool()
 def run_ruff_format(target: str = "src/ tests/", check_only: bool = False) -> str:
     """Run ruff format checker inside the sealed ephemeral Docker sandbox."""
+    gate.require_state(
+        "verification.ruff_format",
+        [PipelineState.STATIC_VERIFY, PipelineState.IMPLEMENTATION, PipelineState.RETRY],
+    )
+
     cmd = ["ruff", "format", "--cache-dir", "/tmp/.ruff_cache"] + target.split()
     if check_only:
         cmd.append("--check")

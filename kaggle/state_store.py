@@ -28,7 +28,11 @@ TERMINAL_STATES = {STATE_COMPLETE, STATE_ERROR, STATE_CANCELLED, STATE_TIMEOUT, 
 class KaggleStateStore:
     def __init__(self, db_path: str = "credentials/kaggle_state.db"):
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.db_path = Path("/tmp/kaggle_state.db")
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:

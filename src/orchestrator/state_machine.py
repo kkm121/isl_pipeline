@@ -404,6 +404,7 @@ class PipelineStateMachine:
     def save_state(self, path: str):
         data = {
             "current_state": self.current_state.name,
+            "tree_baseline": self._tree_baseline,
             "history": [
                 {
                     "from_state": t.from_state.name,
@@ -430,6 +431,7 @@ class PipelineStateMachine:
         with open(path, "r") as f:
             data = json.load(f)
         self.current_state = PipelineState[data["current_state"]]
+        self._tree_baseline = data.get("tree_baseline")
         self.transition_history = [
             StateTransition(
                 from_state=PipelineState[t["from_state"]],

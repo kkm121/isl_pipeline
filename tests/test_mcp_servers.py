@@ -89,45 +89,48 @@ def test_auto_format_validates_safe_python_file():
 
 
 def test_linter_mcp_executes_through_docker_sealed_sandbox():
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="3 passed in 0.05s", stderr=""
-        )
+    with patch("mcp_servers.linter_test_mcp.gate.require_state"):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="3 passed in 0.05s", stderr=""
+            )
 
-        result_raw = run_pytest(test_path="tests/", verbose=True)
-        res = json.loads(result_raw)
+            result_raw = run_pytest(test_path="tests/", verbose=True)
+            res = json.loads(result_raw)
 
-        assert res["execution_boundary"] == "docker-sealed-sandbox"
-        assert res["exit_code"] == 0
+            assert res["execution_boundary"] == "docker-sealed-sandbox"
+            assert res["exit_code"] == 0
 
-        # Verify Docker command parameters
-        called_cmd = mock_run.call_args[0][0]
-        assert called_cmd[0] == "docker"
-        assert called_cmd[1] == "run"
-        assert "--network=none" in called_cmd
-        assert "--read-only" in called_cmd
-        assert "--tmpfs" in called_cmd
-        assert "--security-opt" in called_cmd
-        assert "no-new-privileges" in called_cmd
-        assert "isl-sandbox" in called_cmd
-        assert "pytest" in called_cmd
+            # Verify Docker command parameters
+            called_cmd = mock_run.call_args[0][0]
+            assert called_cmd[0] == "docker"
+            assert called_cmd[1] == "run"
+            assert "--network=none" in called_cmd
+            assert "--read-only" in called_cmd
+            assert "--tmpfs" in called_cmd
+            assert "--security-opt" in called_cmd
+            assert "no-new-privileges" in called_cmd
+            assert "isl-sandbox" in called_cmd
+            assert "pytest" in called_cmd
 
 
 def test_linter_mcp_mypy_sealed_sandbox():
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="Success", stderr="")
-        res = json.loads(run_mypy("src/"))
-        assert res["execution_boundary"] == "docker-sealed-sandbox"
-        called_cmd = mock_run.call_args[0][0]
-        assert "--network=none" in called_cmd
-        assert "mypy" in called_cmd
+    with patch("mcp_servers.linter_test_mcp.gate.require_state"):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="Success", stderr="")
+            res = json.loads(run_mypy("src/"))
+            assert res["execution_boundary"] == "docker-sealed-sandbox"
+            called_cmd = mock_run.call_args[0][0]
+            assert "--network=none" in called_cmd
+            assert "mypy" in called_cmd
 
 
 def test_linter_mcp_handles_docker_not_found():
-    with patch("subprocess.run", side_effect=FileNotFoundError("docker not found")):
-        res = json.loads(run_pytest())
-        assert res["exit_code"] == 1
-        assert "Docker executable not found" in res["stderr"]
+    with patch("mcp_servers.linter_test_mcp.gate.require_state"):
+        with patch("subprocess.run", side_effect=FileNotFoundError("docker not found")):
+            res = json.loads(run_pytest())
+            assert res["exit_code"] == 1
+            assert "Docker executable not found" in res["stderr"]
 
 
 # ==============================================================================
