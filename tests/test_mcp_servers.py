@@ -338,4 +338,3 @@ def test_state_machine_persists_tree_baseline_on_implementation(tmp_path):
 
     assert baseline_sha.exists()
     assert baseline_json.exists()
-

@@ -86,7 +86,7 @@ docker run --rm \
   -v "$PROJECT_ROOT/mcp_servers:/workspace/mcp_servers:ro" \
   -v "$PROJECT_ROOT/scripts:/workspace/scripts:ro" \
   "$SANDBOX_IMAGE" \
-  ruff check src/ tests/ --cache-dir /tmp/.ruff_cache
+  sh -c "ruff check src/ tests/ --cache-dir /tmp/.ruff_cache && ruff format --check src/ tests/"
 record $?
 
 # Step 4: Unit / Integration tests inside sealed container
