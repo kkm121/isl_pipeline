@@ -57,9 +57,15 @@ class KernelManager:
             "kernel_sources": [],
         }
 
-    def submit(self, kernel_name: str, script_path: str, **kwargs: Any) -> KernelSubmission:
+    def submit(
+        self,
+        kernel_name: str,
+        script_path: str,
+        account_id: Optional[str] = None,
+        **kwargs: Any,
+    ) -> KernelSubmission:
         """Submit kernel to Kaggle with SUBMITTING -> QUEUED lifecycle transitions."""
-        account = self.broker.select_account()
+        account = self.broker.select_account(account_id=account_id)
         metadata = self.prepare_metadata(kernel_name, script_path, **kwargs)
         kernel_ref = f"{account.username}/{kernel_name}"
         metadata["id"] = kernel_ref
@@ -202,5 +208,22 @@ class KernelManager:
         except Exception as e:
             logger.warning("Could not set up Kaggle auth env: %s", str(e))
 
-        result = subprocess.run(args, capture_output=True, text=True, check=False, env=env)
+        cmd = list(args)
+        if cmd and cmd[0] == "kaggle":
+            kaggle_bin = shutil.which("kaggle")
+            if not kaggle_bin:
+                candidates = [
+                    Path.home() / "AppData/Roaming/Python/Python314/Scripts/kaggle.exe",
+                    Path.home() / "AppData/Roaming/Python/Python312/Scripts/kaggle.exe",
+                    Path.home() / "AppData/Local/Programs/Python/Python314/Scripts/kaggle.exe",
+                    Path.home() / ".local/bin/kaggle",
+                ]
+                for c in candidates:
+                    if c.exists():
+                        kaggle_bin = str(c)
+                        break
+            if kaggle_bin:
+                cmd[0] = str(kaggle_bin)
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
         return result
