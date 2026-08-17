@@ -87,7 +87,7 @@
 
     // Prediction
     const pred = packet.prediction;
-    if (pred && pred.class_name && (state === "PREDICTED" || fillRatio > 0.8)) {
+    if (pred && pred.class_name && (state === "PREDICTED" || fillRatio > 0.6)) {
       const sign = pred.class_name;
       const conf = (pred.confidence * 100).toFixed(1);
       
@@ -96,7 +96,7 @@
       signStatusSub.textContent = `Recognized with ${conf}% confidence`;
 
       // Trigger automatic TTS if new sign
-      if (sign !== lastPredictedSign && state === "PREDICTED") {
+      if (sign !== lastPredictedSign && (state === "PREDICTED" || pred.is_stable)) {
         lastPredictedSign = sign;
         if (packet.translation && packet.translation.translated_text) {
           translationOutputText.textContent = packet.translation.translated_text;
@@ -107,6 +107,22 @@
       predictedSignText.textContent = "WAITING FOR SIGN";
       confidenceTag.textContent = "-- %";
       signStatusSub.textContent = "Position hands in camera view";
+    }
+
+    // Dynamic Top-5 Candidate Bars
+    if (packet.top_k && Array.isArray(packet.top_k) && candidateBars) {
+      candidateBars.innerHTML = "";
+      packet.top_k.forEach((cand) => {
+        const row = document.createElement("div");
+        row.className = "candidate-row";
+        const pct = Math.round(cand.confidence * 100);
+        row.innerHTML = `
+          <span class="candidate-name" title="${cand.class_name}">${cand.class_name}</span>
+          <div class="candidate-bar-bg"><div class="candidate-bar-fill" style="width: ${pct}%"></div></div>
+          <span class="candidate-pct">${pct}%</span>
+        `;
+        candidateBars.appendChild(row);
+      });
     }
 
     if (packet.translation && packet.translation.translated_text) {
@@ -251,11 +267,11 @@
       });
 
       holistic.setOptions({
-        modelComplexity: 1,
+        modelComplexity: 0,
         smoothLandmarks: true,
         enableSegmentation: false,
         smoothSegmentation: false,
-        refineFaceLandmarks: true,
+        refineFaceLandmarks: false,
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });

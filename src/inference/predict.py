@@ -156,9 +156,19 @@ class StreamingSignPredictor:
             probs = torch.softmax(outputs, dim=1).squeeze(0)
         infer_latency_ms = (time.perf_counter() - infer_start) * 1000.0
 
-        top_prob, top_idx = torch.topk(probs, k=1)
-        best_prob = float(top_prob.item())
-        best_idx = int(top_idx.item())
+        k_val = min(5, len(self.class_names))
+        top_k_probs, top_k_indices = torch.topk(probs, k=k_val)
+        top_k = [
+            {
+                "class_id": int(idx.item()),
+                "class_name": self.class_names[int(idx.item())] if int(idx.item()) < len(self.class_names) else f"CLASS_{int(idx.item())}",
+                "confidence": float(prob.item()),
+            }
+            for prob, idx in zip(top_k_probs, top_k_indices)
+        ]
+
+        best_prob = float(top_k_probs[0].item())
+        best_idx = int(top_k_indices[0].item())
 
         # Temporal Consensus Smoothing
         self.prediction_history.append(best_idx)
@@ -197,6 +207,7 @@ class StreamingSignPredictor:
                 "confidence": best_prob,
                 "is_stable": False,
             },
+            "top_k": top_k,
             "inference_latency_ms": infer_latency_ms,
             "total_latency_ms": total_latency_ms,
         }
