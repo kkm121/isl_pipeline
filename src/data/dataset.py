@@ -199,16 +199,18 @@ class SignerDisjointSplitter:
 
         num_signers = len(unique_signers)
         if num_signers < 3:
-            logger.warning(f"Only {num_signers} unique signers found. Falling back to sample-level split.")
-            indices = np.arange(len(signer_ids))
-            rng.shuffle(indices)
-            n = len(indices)
-            n_tr = int(n * train_ratio)
-            n_va = int(n * val_ratio)
-            return indices[:n_tr].tolist(), indices[n_tr : n_tr + n_va].tolist(), indices[n_tr + n_va :].tolist()
+            raise ValueError(
+                f"Only {num_signers} unique signers found. Minimum 3 signers required for strict disjoint splitting."
+            )
 
         n_train = max(1, int(round(num_signers * train_ratio)))
         n_val = max(1, int(round(num_signers * val_ratio)))
+
+        if n_train + n_val >= num_signers:
+            if n_train > 1:
+                n_train -= 1
+            elif n_val > 1:
+                n_val -= 1
 
         train_signers: Set[Any] = set(unique_signers[:n_train])
         val_signers: Set[Any] = set(unique_signers[n_train : n_train + n_val])
@@ -360,7 +362,6 @@ class ISLDataModule:
 
         return train_ds, val_ds, test_ds
 
-
     def get_dataloaders(self, batch_size: int = 32, num_workers: int = 0) -> Tuple[DataLoader, DataLoader, DataLoader]:
         train_ds, val_ds, test_ds = self.split()
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
@@ -394,7 +395,7 @@ class ISLDataModule:
         self.sequences = np.random.randn(total_samples, seq_len, kps, dim)
         self.labels = np.random.randint(0, self.config.num_classes, total_samples)
         if getattr(self.config, "use_signer_disjoint", False) or num_signers is not None:
-            signers_count = num_signers or 5
+            signers_count = num_signers if num_signers is not None else 10
             self.signer_ids = [f"signer_{i % signers_count}" for i in range(total_samples)]
         else:
             self.signer_ids = None

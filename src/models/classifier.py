@@ -68,7 +68,6 @@ class ISLClassifier(nn.Module):
 
         return self.classifier(out)
 
-
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
@@ -181,7 +180,6 @@ class Tier1TemporalCNN(nn.Module):
             pooled = feat.mean(dim=2)
 
         return self.classifier(pooled)
-
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

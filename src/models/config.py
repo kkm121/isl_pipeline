@@ -15,7 +15,7 @@ class DataConfig:
     val_split: float = 0.15
     test_split: float = 0.15
     random_seed: int = 42
-    use_signer_disjoint: bool = False
+    use_signer_disjoint: bool = True
 
 
 @dataclass

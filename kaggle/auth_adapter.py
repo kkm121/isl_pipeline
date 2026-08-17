@@ -47,12 +47,7 @@ class KaggleAuthAdapter:
             os.chmod(temp_json, 0o600)
 
             self.active_temp_dir = temp_dir
-            return {
-                "KAGGLE_CONFIG_DIR": temp_dir,
-                "KAGGLE_USERNAME": creds.get("username", ""),
-                "KAGGLE_KEY": creds.get("key", ""),
-                "KAGGLE_API_TOKEN": creds.get("key", ""),
-            }
+            return {"KAGGLE_CONFIG_DIR": temp_dir}
 
         elif method == AuthMethod.API_TOKEN:
             token = os.environ["KAGGLE_API_TOKEN"]

@@ -1,1369 +1,1255 @@
-import logging
-import time
-from typing import Any, Dict, List, Optional
-
-from src.models.config import SynthesisConfig
-
-logger = logging.getLogger(__name__)
-
-# Core Educational / Classroom Phrases translation dictionary for offline/instant mode
-OFFLINE_CLASSROOM_LEXICON: Dict[str, Dict[str, str]] = {
+{
     "A": {
         "hin_Deva": "[hin_Deva] A",
         "tam_Taml": "[tam_Taml] A",
         "tel_Telu": "[tel_Telu] A",
         "ben_Beng": "[ben_Beng] A",
-        "mar_Mrai": "[mar_Mrai] A",
+        "mar_Mrai": "[mar_Mrai] A"
     },
     "B": {
         "hin_Deva": "[hin_Deva] B",
         "tam_Taml": "[tam_Taml] B",
         "tel_Telu": "[tel_Telu] B",
         "ben_Beng": "[ben_Beng] B",
-        "mar_Mrai": "[mar_Mrai] B",
+        "mar_Mrai": "[mar_Mrai] B"
     },
     "C": {
         "hin_Deva": "[hin_Deva] C",
         "tam_Taml": "[tam_Taml] C",
         "tel_Telu": "[tel_Telu] C",
         "ben_Beng": "[ben_Beng] C",
-        "mar_Mrai": "[mar_Mrai] C",
+        "mar_Mrai": "[mar_Mrai] C"
     },
     "D": {
         "hin_Deva": "[hin_Deva] D",
         "tam_Taml": "[tam_Taml] D",
         "tel_Telu": "[tel_Telu] D",
         "ben_Beng": "[ben_Beng] D",
-        "mar_Mrai": "[mar_Mrai] D",
+        "mar_Mrai": "[mar_Mrai] D"
     },
     "E": {
         "hin_Deva": "[hin_Deva] E",
         "tam_Taml": "[tam_Taml] E",
         "tel_Telu": "[tel_Telu] E",
         "ben_Beng": "[ben_Beng] E",
-        "mar_Mrai": "[mar_Mrai] E",
+        "mar_Mrai": "[mar_Mrai] E"
     },
     "F": {
         "hin_Deva": "[hin_Deva] F",
         "tam_Taml": "[tam_Taml] F",
         "tel_Telu": "[tel_Telu] F",
         "ben_Beng": "[ben_Beng] F",
-        "mar_Mrai": "[mar_Mrai] F",
+        "mar_Mrai": "[mar_Mrai] F"
     },
     "G": {
         "hin_Deva": "[hin_Deva] G",
         "tam_Taml": "[tam_Taml] G",
         "tel_Telu": "[tel_Telu] G",
         "ben_Beng": "[ben_Beng] G",
-        "mar_Mrai": "[mar_Mrai] G",
+        "mar_Mrai": "[mar_Mrai] G"
     },
     "H": {
         "hin_Deva": "[hin_Deva] H",
         "tam_Taml": "[tam_Taml] H",
         "tel_Telu": "[tel_Telu] H",
         "ben_Beng": "[ben_Beng] H",
-        "mar_Mrai": "[mar_Mrai] H",
+        "mar_Mrai": "[mar_Mrai] H"
     },
     "I": {
         "hin_Deva": "[hin_Deva] I",
         "tam_Taml": "[tam_Taml] I",
         "tel_Telu": "[tel_Telu] I",
         "ben_Beng": "[ben_Beng] I",
-        "mar_Mrai": "[mar_Mrai] I",
+        "mar_Mrai": "[mar_Mrai] I"
     },
     "J": {
         "hin_Deva": "[hin_Deva] J",
         "tam_Taml": "[tam_Taml] J",
         "tel_Telu": "[tel_Telu] J",
         "ben_Beng": "[ben_Beng] J",
-        "mar_Mrai": "[mar_Mrai] J",
+        "mar_Mrai": "[mar_Mrai] J"
     },
     "K": {
         "hin_Deva": "[hin_Deva] K",
         "tam_Taml": "[tam_Taml] K",
         "tel_Telu": "[tel_Telu] K",
         "ben_Beng": "[ben_Beng] K",
-        "mar_Mrai": "[mar_Mrai] K",
+        "mar_Mrai": "[mar_Mrai] K"
     },
     "L": {
         "hin_Deva": "[hin_Deva] L",
         "tam_Taml": "[tam_Taml] L",
         "tel_Telu": "[tel_Telu] L",
         "ben_Beng": "[ben_Beng] L",
-        "mar_Mrai": "[mar_Mrai] L",
+        "mar_Mrai": "[mar_Mrai] L"
     },
     "M": {
         "hin_Deva": "[hin_Deva] M",
         "tam_Taml": "[tam_Taml] M",
         "tel_Telu": "[tel_Telu] M",
         "ben_Beng": "[ben_Beng] M",
-        "mar_Mrai": "[mar_Mrai] M",
+        "mar_Mrai": "[mar_Mrai] M"
     },
     "N": {
         "hin_Deva": "[hin_Deva] N",
         "tam_Taml": "[tam_Taml] N",
         "tel_Telu": "[tel_Telu] N",
         "ben_Beng": "[ben_Beng] N",
-        "mar_Mrai": "[mar_Mrai] N",
+        "mar_Mrai": "[mar_Mrai] N"
     },
     "O": {
         "hin_Deva": "[hin_Deva] O",
         "tam_Taml": "[tam_Taml] O",
         "tel_Telu": "[tel_Telu] O",
         "ben_Beng": "[ben_Beng] O",
-        "mar_Mrai": "[mar_Mrai] O",
+        "mar_Mrai": "[mar_Mrai] O"
     },
     "P": {
         "hin_Deva": "[hin_Deva] P",
         "tam_Taml": "[tam_Taml] P",
         "tel_Telu": "[tel_Telu] P",
         "ben_Beng": "[ben_Beng] P",
-        "mar_Mrai": "[mar_Mrai] P",
+        "mar_Mrai": "[mar_Mrai] P"
     },
     "Q": {
         "hin_Deva": "[hin_Deva] Q",
         "tam_Taml": "[tam_Taml] Q",
         "tel_Telu": "[tel_Telu] Q",
         "ben_Beng": "[ben_Beng] Q",
-        "mar_Mrai": "[mar_Mrai] Q",
+        "mar_Mrai": "[mar_Mrai] Q"
     },
     "R": {
         "hin_Deva": "[hin_Deva] R",
         "tam_Taml": "[tam_Taml] R",
         "tel_Telu": "[tel_Telu] R",
         "ben_Beng": "[ben_Beng] R",
-        "mar_Mrai": "[mar_Mrai] R",
+        "mar_Mrai": "[mar_Mrai] R"
     },
     "S": {
         "hin_Deva": "[hin_Deva] S",
         "tam_Taml": "[tam_Taml] S",
         "tel_Telu": "[tel_Telu] S",
         "ben_Beng": "[ben_Beng] S",
-        "mar_Mrai": "[mar_Mrai] S",
+        "mar_Mrai": "[mar_Mrai] S"
     },
     "T": {
         "hin_Deva": "[hin_Deva] T",
         "tam_Taml": "[tam_Taml] T",
         "tel_Telu": "[tel_Telu] T",
         "ben_Beng": "[ben_Beng] T",
-        "mar_Mrai": "[mar_Mrai] T",
+        "mar_Mrai": "[mar_Mrai] T"
     },
     "U": {
         "hin_Deva": "[hin_Deva] U",
         "tam_Taml": "[tam_Taml] U",
         "tel_Telu": "[tel_Telu] U",
         "ben_Beng": "[ben_Beng] U",
-        "mar_Mrai": "[mar_Mrai] U",
+        "mar_Mrai": "[mar_Mrai] U"
     },
     "V": {
         "hin_Deva": "[hin_Deva] V",
         "tam_Taml": "[tam_Taml] V",
         "tel_Telu": "[tel_Telu] V",
         "ben_Beng": "[ben_Beng] V",
-        "mar_Mrai": "[mar_Mrai] V",
+        "mar_Mrai": "[mar_Mrai] V"
     },
     "W": {
         "hin_Deva": "[hin_Deva] W",
         "tam_Taml": "[tam_Taml] W",
         "tel_Telu": "[tel_Telu] W",
         "ben_Beng": "[ben_Beng] W",
-        "mar_Mrai": "[mar_Mrai] W",
+        "mar_Mrai": "[mar_Mrai] W"
     },
     "X": {
         "hin_Deva": "[hin_Deva] X",
         "tam_Taml": "[tam_Taml] X",
         "tel_Telu": "[tel_Telu] X",
         "ben_Beng": "[ben_Beng] X",
-        "mar_Mrai": "[mar_Mrai] X",
+        "mar_Mrai": "[mar_Mrai] X"
     },
     "Y": {
         "hin_Deva": "[hin_Deva] Y",
         "tam_Taml": "[tam_Taml] Y",
         "tel_Telu": "[tel_Telu] Y",
         "ben_Beng": "[ben_Beng] Y",
-        "mar_Mrai": "[mar_Mrai] Y",
+        "mar_Mrai": "[mar_Mrai] Y"
     },
     "Z": {
         "hin_Deva": "[hin_Deva] Z",
         "tam_Taml": "[tam_Taml] Z",
         "tel_Telu": "[tel_Telu] Z",
         "ben_Beng": "[ben_Beng] Z",
-        "mar_Mrai": "[mar_Mrai] Z",
+        "mar_Mrai": "[mar_Mrai] Z"
     },
     "0": {
         "hin_Deva": "[hin_Deva] 0",
         "tam_Taml": "[tam_Taml] 0",
         "tel_Telu": "[tel_Telu] 0",
         "ben_Beng": "[ben_Beng] 0",
-        "mar_Mrai": "[mar_Mrai] 0",
+        "mar_Mrai": "[mar_Mrai] 0"
     },
     "1": {
         "hin_Deva": "[hin_Deva] 1",
         "tam_Taml": "[tam_Taml] 1",
         "tel_Telu": "[tel_Telu] 1",
         "ben_Beng": "[ben_Beng] 1",
-        "mar_Mrai": "[mar_Mrai] 1",
+        "mar_Mrai": "[mar_Mrai] 1"
     },
     "2": {
         "hin_Deva": "[hin_Deva] 2",
         "tam_Taml": "[tam_Taml] 2",
         "tel_Telu": "[tel_Telu] 2",
         "ben_Beng": "[ben_Beng] 2",
-        "mar_Mrai": "[mar_Mrai] 2",
+        "mar_Mrai": "[mar_Mrai] 2"
     },
     "3": {
         "hin_Deva": "[hin_Deva] 3",
         "tam_Taml": "[tam_Taml] 3",
         "tel_Telu": "[tel_Telu] 3",
         "ben_Beng": "[ben_Beng] 3",
-        "mar_Mrai": "[mar_Mrai] 3",
+        "mar_Mrai": "[mar_Mrai] 3"
     },
     "4": {
         "hin_Deva": "[hin_Deva] 4",
         "tam_Taml": "[tam_Taml] 4",
         "tel_Telu": "[tel_Telu] 4",
         "ben_Beng": "[ben_Beng] 4",
-        "mar_Mrai": "[mar_Mrai] 4",
+        "mar_Mrai": "[mar_Mrai] 4"
     },
     "5": {
         "hin_Deva": "[hin_Deva] 5",
         "tam_Taml": "[tam_Taml] 5",
         "tel_Telu": "[tel_Telu] 5",
         "ben_Beng": "[ben_Beng] 5",
-        "mar_Mrai": "[mar_Mrai] 5",
+        "mar_Mrai": "[mar_Mrai] 5"
     },
     "6": {
         "hin_Deva": "[hin_Deva] 6",
         "tam_Taml": "[tam_Taml] 6",
         "tel_Telu": "[tel_Telu] 6",
         "ben_Beng": "[ben_Beng] 6",
-        "mar_Mrai": "[mar_Mrai] 6",
+        "mar_Mrai": "[mar_Mrai] 6"
     },
     "7": {
         "hin_Deva": "[hin_Deva] 7",
         "tam_Taml": "[tam_Taml] 7",
         "tel_Telu": "[tel_Telu] 7",
         "ben_Beng": "[ben_Beng] 7",
-        "mar_Mrai": "[mar_Mrai] 7",
+        "mar_Mrai": "[mar_Mrai] 7"
     },
     "8": {
         "hin_Deva": "[hin_Deva] 8",
         "tam_Taml": "[tam_Taml] 8",
         "tel_Telu": "[tel_Telu] 8",
         "ben_Beng": "[ben_Beng] 8",
-        "mar_Mrai": "[mar_Mrai] 8",
+        "mar_Mrai": "[mar_Mrai] 8"
     },
     "9": {
         "hin_Deva": "[hin_Deva] 9",
         "tam_Taml": "[tam_Taml] 9",
         "tel_Telu": "[tel_Telu] 9",
         "ben_Beng": "[ben_Beng] 9",
-        "mar_Mrai": "[mar_Mrai] 9",
+        "mar_Mrai": "[mar_Mrai] 9"
     },
     "TEACHER": {
         "hin_Deva": "अध्यापक (Adhyapak)",
         "tam_Taml": "ஆசிரியர் (Aasiriyar)",
         "tel_Telu": "ఉపాధ్యాయుడు (Upadhyaya)",
         "ben_Beng": "শিক্ষক (Shikkhok)",
-        "mar_Mrai": "शिक्षक (Shikshak)",
+        "mar_Mrai": "शिक्षक (Shikshak)"
     },
     "STUDENT": {
         "hin_Deva": "छात्र (Chhatra)",
         "tam_Taml": "மாணவர் (Maanavar)",
         "tel_Telu": "విద్యార్థి (Vidyarthi)",
         "ben_Beng": "ছাত্র (Chhatro)",
-        "mar_Mrai": "विद्यार्थी (Vidyarthi)",
+        "mar_Mrai": "विद्यार्थी (Vidyarthi)"
     },
     "PRINCIPAL": {
         "hin_Deva": "[hin_Deva] PRINCIPAL",
         "tam_Taml": "[tam_Taml] PRINCIPAL",
         "tel_Telu": "[tel_Telu] PRINCIPAL",
         "ben_Beng": "[ben_Beng] PRINCIPAL",
-        "mar_Mrai": "[mar_Mrai] PRINCIPAL",
+        "mar_Mrai": "[mar_Mrai] PRINCIPAL"
     },
     "CLASSMATE": {
         "hin_Deva": "[hin_Deva] CLASSMATE",
         "tam_Taml": "[tam_Taml] CLASSMATE",
         "tel_Telu": "[tel_Telu] CLASSMATE",
         "ben_Beng": "[ben_Beng] CLASSMATE",
-        "mar_Mrai": "[mar_Mrai] CLASSMATE",
+        "mar_Mrai": "[mar_Mrai] CLASSMATE"
     },
     "FRIEND": {
         "hin_Deva": "[hin_Deva] FRIEND",
         "tam_Taml": "[tam_Taml] FRIEND",
         "tel_Telu": "[tel_Telu] FRIEND",
         "ben_Beng": "[ben_Beng] FRIEND",
-        "mar_Mrai": "[mar_Mrai] FRIEND",
+        "mar_Mrai": "[mar_Mrai] FRIEND"
     },
     "PARENT": {
         "hin_Deva": "[hin_Deva] PARENT",
         "tam_Taml": "[tam_Taml] PARENT",
         "tel_Telu": "[tel_Telu] PARENT",
         "ben_Beng": "[ben_Beng] PARENT",
-        "mar_Mrai": "[mar_Mrai] PARENT",
+        "mar_Mrai": "[mar_Mrai] PARENT"
     },
     "DOCTOR": {
         "hin_Deva": "[hin_Deva] DOCTOR",
         "tam_Taml": "[tam_Taml] DOCTOR",
         "tel_Telu": "[tel_Telu] DOCTOR",
         "ben_Beng": "[ben_Beng] DOCTOR",
-        "mar_Mrai": "[mar_Mrai] DOCTOR",
+        "mar_Mrai": "[mar_Mrai] DOCTOR"
     },
     "DEAF": {
         "hin_Deva": "[hin_Deva] DEAF",
         "tam_Taml": "[tam_Taml] DEAF",
         "tel_Telu": "[tel_Telu] DEAF",
         "ben_Beng": "[ben_Beng] DEAF",
-        "mar_Mrai": "[mar_Mrai] DEAF",
+        "mar_Mrai": "[mar_Mrai] DEAF"
     },
     "HEARING": {
         "hin_Deva": "[hin_Deva] HEARING",
         "tam_Taml": "[tam_Taml] HEARING",
         "tel_Telu": "[tel_Telu] HEARING",
         "ben_Beng": "[ben_Beng] HEARING",
-        "mar_Mrai": "[mar_Mrai] HEARING",
+        "mar_Mrai": "[mar_Mrai] HEARING"
     },
     "INTERPRETER": {
         "hin_Deva": "[hin_Deva] INTERPRETER",
         "tam_Taml": "[tam_Taml] INTERPRETER",
         "tel_Telu": "[tel_Telu] INTERPRETER",
         "ben_Beng": "[ben_Beng] INTERPRETER",
-        "mar_Mrai": "[mar_Mrai] INTERPRETER",
+        "mar_Mrai": "[mar_Mrai] INTERPRETER"
     },
     "BOY": {
         "hin_Deva": "[hin_Deva] BOY",
         "tam_Taml": "[tam_Taml] BOY",
         "tel_Telu": "[tel_Telu] BOY",
         "ben_Beng": "[ben_Beng] BOY",
-        "mar_Mrai": "[mar_Mrai] BOY",
+        "mar_Mrai": "[mar_Mrai] BOY"
     },
     "GIRL": {
         "hin_Deva": "[hin_Deva] GIRL",
         "tam_Taml": "[tam_Taml] GIRL",
         "tel_Telu": "[tel_Telu] GIRL",
         "ben_Beng": "[ben_Beng] GIRL",
-        "mar_Mrai": "[mar_Mrai] GIRL",
+        "mar_Mrai": "[mar_Mrai] GIRL"
     },
     "CHILD": {
         "hin_Deva": "[hin_Deva] CHILD",
         "tam_Taml": "[tam_Taml] CHILD",
         "tel_Telu": "[tel_Telu] CHILD",
         "ben_Beng": "[ben_Beng] CHILD",
-        "mar_Mrai": "[mar_Mrai] CHILD",
+        "mar_Mrai": "[mar_Mrai] CHILD"
     },
     "TEAM": {
         "hin_Deva": "[hin_Deva] TEAM",
         "tam_Taml": "[tam_Taml] TEAM",
         "tel_Telu": "[tel_Telu] TEAM",
         "ben_Beng": "[ben_Beng] TEAM",
-        "mar_Mrai": "[mar_Mrai] TEAM",
+        "mar_Mrai": "[mar_Mrai] TEAM"
     },
     "BOOK": {
         "hin_Deva": "किताब (Kitab)",
         "tam_Taml": "புத்தகம் (Puthagam)",
         "tel_Telu": "పుస్తకం (Pusthakam)",
         "ben_Beng": "বই (Boi)",
-        "mar_Mrai": "पुस्तक (Pustak)",
+        "mar_Mrai": "पुस्तक (Pustak)"
     },
     "PEN": {
         "hin_Deva": "[hin_Deva] PEN",
         "tam_Taml": "[tam_Taml] PEN",
         "tel_Telu": "[tel_Telu] PEN",
         "ben_Beng": "[ben_Beng] PEN",
-        "mar_Mrai": "[mar_Mrai] PEN",
+        "mar_Mrai": "[mar_Mrai] PEN"
     },
     "PENCIL": {
         "hin_Deva": "[hin_Deva] PENCIL",
         "tam_Taml": "[tam_Taml] PENCIL",
         "tel_Telu": "[tel_Telu] PENCIL",
         "ben_Beng": "[ben_Beng] PENCIL",
-        "mar_Mrai": "[mar_Mrai] PENCIL",
+        "mar_Mrai": "[mar_Mrai] PENCIL"
     },
     "NOTEBOOK": {
         "hin_Deva": "[hin_Deva] NOTEBOOK",
         "tam_Taml": "[tam_Taml] NOTEBOOK",
         "tel_Telu": "[tel_Telu] NOTEBOOK",
         "ben_Beng": "[ben_Beng] NOTEBOOK",
-        "mar_Mrai": "[mar_Mrai] NOTEBOOK",
+        "mar_Mrai": "[mar_Mrai] NOTEBOOK"
     },
     "DESK": {
         "hin_Deva": "[hin_Deva] DESK",
         "tam_Taml": "[tam_Taml] DESK",
         "tel_Telu": "[tel_Telu] DESK",
         "ben_Beng": "[ben_Beng] DESK",
-        "mar_Mrai": "[mar_Mrai] DESK",
+        "mar_Mrai": "[mar_Mrai] DESK"
     },
     "CHAIR": {
         "hin_Deva": "[hin_Deva] CHAIR",
         "tam_Taml": "[tam_Taml] CHAIR",
         "tel_Telu": "[tel_Telu] CHAIR",
         "ben_Beng": "[ben_Beng] CHAIR",
-        "mar_Mrai": "[mar_Mrai] CHAIR",
+        "mar_Mrai": "[mar_Mrai] CHAIR"
     },
     "BLACKBOARD": {
         "hin_Deva": "[hin_Deva] BLACKBOARD",
         "tam_Taml": "[tam_Taml] BLACKBOARD",
         "tel_Telu": "[tel_Telu] BLACKBOARD",
         "ben_Beng": "[ben_Beng] BLACKBOARD",
-        "mar_Mrai": "[mar_Mrai] BLACKBOARD",
+        "mar_Mrai": "[mar_Mrai] BLACKBOARD"
     },
     "COMPUTER": {
         "hin_Deva": "[hin_Deva] COMPUTER",
         "tam_Taml": "[tam_Taml] COMPUTER",
         "tel_Telu": "[tel_Telu] COMPUTER",
         "ben_Beng": "[ben_Beng] COMPUTER",
-        "mar_Mrai": "[mar_Mrai] COMPUTER",
+        "mar_Mrai": "[mar_Mrai] COMPUTER"
     },
     "BAG": {
         "hin_Deva": "[hin_Deva] BAG",
         "tam_Taml": "[tam_Taml] BAG",
         "tel_Telu": "[tel_Telu] BAG",
         "ben_Beng": "[ben_Beng] BAG",
-        "mar_Mrai": "[mar_Mrai] BAG",
+        "mar_Mrai": "[mar_Mrai] BAG"
     },
     "PAPER": {
         "hin_Deva": "[hin_Deva] PAPER",
         "tam_Taml": "[tam_Taml] PAPER",
         "tel_Telu": "[tel_Telu] PAPER",
         "ben_Beng": "[ben_Beng] PAPER",
-        "mar_Mrai": "[mar_Mrai] PAPER",
+        "mar_Mrai": "[mar_Mrai] PAPER"
     },
     "ERASER": {
         "hin_Deva": "[hin_Deva] ERASER",
         "tam_Taml": "[tam_Taml] ERASER",
         "tel_Telu": "[tel_Telu] ERASER",
         "ben_Beng": "[ben_Beng] ERASER",
-        "mar_Mrai": "[mar_Mrai] ERASER",
+        "mar_Mrai": "[mar_Mrai] ERASER"
     },
     "RULER": {
         "hin_Deva": "[hin_Deva] RULER",
         "tam_Taml": "[tam_Taml] RULER",
         "tel_Telu": "[tel_Telu] RULER",
         "ben_Beng": "[ben_Beng] RULER",
-        "mar_Mrai": "[mar_Mrai] RULER",
+        "mar_Mrai": "[mar_Mrai] RULER"
     },
     "SCISSORS": {
         "hin_Deva": "[hin_Deva] SCISSORS",
         "tam_Taml": "[tam_Taml] SCISSORS",
         "tel_Telu": "[tel_Telu] SCISSORS",
         "ben_Beng": "[ben_Beng] SCISSORS",
-        "mar_Mrai": "[mar_Mrai] SCISSORS",
+        "mar_Mrai": "[mar_Mrai] SCISSORS"
     },
     "CALCULATOR": {
         "hin_Deva": "[hin_Deva] CALCULATOR",
         "tam_Taml": "[tam_Taml] CALCULATOR",
         "tel_Telu": "[tel_Telu] CALCULATOR",
         "ben_Beng": "[ben_Beng] CALCULATOR",
-        "mar_Mrai": "[mar_Mrai] CALCULATOR",
+        "mar_Mrai": "[mar_Mrai] CALCULATOR"
     },
     "PROJECTOR": {
         "hin_Deva": "[hin_Deva] PROJECTOR",
         "tam_Taml": "[tam_Taml] PROJECTOR",
         "tel_Telu": "[tel_Telu] PROJECTOR",
         "ben_Beng": "[ben_Beng] PROJECTOR",
-        "mar_Mrai": "[mar_Mrai] PROJECTOR",
+        "mar_Mrai": "[mar_Mrai] PROJECTOR"
     },
     "BELL": {
         "hin_Deva": "[hin_Deva] BELL",
         "tam_Taml": "[tam_Taml] BELL",
         "tel_Telu": "[tel_Telu] BELL",
         "ben_Beng": "[ben_Beng] BELL",
-        "mar_Mrai": "[mar_Mrai] BELL",
+        "mar_Mrai": "[mar_Mrai] BELL"
     },
     "CLOCK": {
         "hin_Deva": "[hin_Deva] CLOCK",
         "tam_Taml": "[tam_Taml] CLOCK",
         "tel_Telu": "[tel_Telu] CLOCK",
         "ben_Beng": "[ben_Beng] CLOCK",
-        "mar_Mrai": "[mar_Mrai] CLOCK",
+        "mar_Mrai": "[mar_Mrai] CLOCK"
     },
     "DOOR": {
         "hin_Deva": "[hin_Deva] DOOR",
         "tam_Taml": "[tam_Taml] DOOR",
         "tel_Telu": "[tel_Telu] DOOR",
         "ben_Beng": "[ben_Beng] DOOR",
-        "mar_Mrai": "[mar_Mrai] DOOR",
+        "mar_Mrai": "[mar_Mrai] DOOR"
     },
     "WINDOW": {
         "hin_Deva": "[hin_Deva] WINDOW",
         "tam_Taml": "[tam_Taml] WINDOW",
         "tel_Telu": "[tel_Telu] WINDOW",
         "ben_Beng": "[ben_Beng] WINDOW",
-        "mar_Mrai": "[mar_Mrai] WINDOW",
+        "mar_Mrai": "[mar_Mrai] WINDOW"
     },
     "LIBRARY": {
         "hin_Deva": "[hin_Deva] LIBRARY",
         "tam_Taml": "[tam_Taml] LIBRARY",
         "tel_Telu": "[tel_Telu] LIBRARY",
         "ben_Beng": "[ben_Beng] LIBRARY",
-        "mar_Mrai": "[mar_Mrai] LIBRARY",
+        "mar_Mrai": "[mar_Mrai] LIBRARY"
     },
     "MATH": {
         "hin_Deva": "[hin_Deva] MATH",
         "tam_Taml": "[tam_Taml] MATH",
         "tel_Telu": "[tel_Telu] MATH",
         "ben_Beng": "[ben_Beng] MATH",
-        "mar_Mrai": "[mar_Mrai] MATH",
+        "mar_Mrai": "[mar_Mrai] MATH"
     },
     "SCIENCE": {
         "hin_Deva": "[hin_Deva] SCIENCE",
         "tam_Taml": "[tam_Taml] SCIENCE",
         "tel_Telu": "[tel_Telu] SCIENCE",
         "ben_Beng": "[ben_Beng] SCIENCE",
-        "mar_Mrai": "[mar_Mrai] SCIENCE",
+        "mar_Mrai": "[mar_Mrai] SCIENCE"
     },
     "ENGLISH": {
         "hin_Deva": "[hin_Deva] ENGLISH",
         "tam_Taml": "[tam_Taml] ENGLISH",
         "tel_Telu": "[tel_Telu] ENGLISH",
         "ben_Beng": "[ben_Beng] ENGLISH",
-        "mar_Mrai": "[mar_Mrai] ENGLISH",
+        "mar_Mrai": "[mar_Mrai] ENGLISH"
     },
     "HINDI": {
         "hin_Deva": "[hin_Deva] HINDI",
         "tam_Taml": "[tam_Taml] HINDI",
         "tel_Telu": "[tel_Telu] HINDI",
         "ben_Beng": "[ben_Beng] HINDI",
-        "mar_Mrai": "[mar_Mrai] HINDI",
+        "mar_Mrai": "[mar_Mrai] HINDI"
     },
     "HISTORY": {
         "hin_Deva": "[hin_Deva] HISTORY",
         "tam_Taml": "[tam_Taml] HISTORY",
         "tel_Telu": "[tel_Telu] HISTORY",
         "ben_Beng": "[ben_Beng] HISTORY",
-        "mar_Mrai": "[mar_Mrai] HISTORY",
+        "mar_Mrai": "[mar_Mrai] HISTORY"
     },
     "GEOGRAPHY": {
         "hin_Deva": "[hin_Deva] GEOGRAPHY",
         "tam_Taml": "[tam_Taml] GEOGRAPHY",
         "tel_Telu": "[tel_Telu] GEOGRAPHY",
         "ben_Beng": "[ben_Beng] GEOGRAPHY",
-        "mar_Mrai": "[mar_Mrai] GEOGRAPHY",
+        "mar_Mrai": "[mar_Mrai] GEOGRAPHY"
     },
     "PHYSICS": {
         "hin_Deva": "[hin_Deva] PHYSICS",
         "tam_Taml": "[tam_Taml] PHYSICS",
         "tel_Telu": "[tel_Telu] PHYSICS",
         "ben_Beng": "[ben_Beng] PHYSICS",
-        "mar_Mrai": "[mar_Mrai] PHYSICS",
+        "mar_Mrai": "[mar_Mrai] PHYSICS"
     },
     "CHEMISTRY": {
         "hin_Deva": "[hin_Deva] CHEMISTRY",
         "tam_Taml": "[tam_Taml] CHEMISTRY",
         "tel_Telu": "[tel_Telu] CHEMISTRY",
         "ben_Beng": "[ben_Beng] CHEMISTRY",
-        "mar_Mrai": "[mar_Mrai] CHEMISTRY",
+        "mar_Mrai": "[mar_Mrai] CHEMISTRY"
     },
     "BIOLOGY": {
         "hin_Deva": "[hin_Deva] BIOLOGY",
         "tam_Taml": "[tam_Taml] BIOLOGY",
         "tel_Telu": "[tel_Telu] BIOLOGY",
         "ben_Beng": "[ben_Beng] BIOLOGY",
-        "mar_Mrai": "[mar_Mrai] BIOLOGY",
+        "mar_Mrai": "[mar_Mrai] BIOLOGY"
     },
     "COMPUTER_SCIENCE": {
         "hin_Deva": "[hin_Deva] COMPUTER_SCIENCE",
         "tam_Taml": "[tam_Taml] COMPUTER_SCIENCE",
         "tel_Telu": "[tel_Telu] COMPUTER_SCIENCE",
         "ben_Beng": "[ben_Beng] COMPUTER_SCIENCE",
-        "mar_Mrai": "[mar_Mrai] COMPUTER_SCIENCE",
+        "mar_Mrai": "[mar_Mrai] COMPUTER_SCIENCE"
     },
     "ART": {
         "hin_Deva": "[hin_Deva] ART",
         "tam_Taml": "[tam_Taml] ART",
         "tel_Telu": "[tel_Telu] ART",
         "ben_Beng": "[ben_Beng] ART",
-        "mar_Mrai": "[mar_Mrai] ART",
+        "mar_Mrai": "[mar_Mrai] ART"
     },
     "MUSIC": {
         "hin_Deva": "[hin_Deva] MUSIC",
         "tam_Taml": "[tam_Taml] MUSIC",
         "tel_Telu": "[tel_Telu] MUSIC",
         "ben_Beng": "[ben_Beng] MUSIC",
-        "mar_Mrai": "[mar_Mrai] MUSIC",
+        "mar_Mrai": "[mar_Mrai] MUSIC"
     },
     "SPORTS": {
         "hin_Deva": "[hin_Deva] SPORTS",
         "tam_Taml": "[tam_Taml] SPORTS",
         "tel_Telu": "[tel_Telu] SPORTS",
         "ben_Beng": "[ben_Beng] SPORTS",
-        "mar_Mrai": "[mar_Mrai] SPORTS",
+        "mar_Mrai": "[mar_Mrai] SPORTS"
     },
     "EXAM": {
         "hin_Deva": "[hin_Deva] EXAM",
         "tam_Taml": "[tam_Taml] EXAM",
         "tel_Telu": "[tel_Telu] EXAM",
         "ben_Beng": "[ben_Beng] EXAM",
-        "mar_Mrai": "[mar_Mrai] EXAM",
+        "mar_Mrai": "[mar_Mrai] EXAM"
     },
     "HOMEWORK": {
         "hin_Deva": "[hin_Deva] HOMEWORK",
         "tam_Taml": "[tam_Taml] HOMEWORK",
         "tel_Telu": "[tel_Telu] HOMEWORK",
         "ben_Beng": "[ben_Beng] HOMEWORK",
-        "mar_Mrai": "[mar_Mrai] HOMEWORK",
+        "mar_Mrai": "[mar_Mrai] HOMEWORK"
     },
     "READ": {
         "hin_Deva": "[hin_Deva] READ",
         "tam_Taml": "[tam_Taml] READ",
         "tel_Telu": "[tel_Telu] READ",
         "ben_Beng": "[ben_Beng] READ",
-        "mar_Mrai": "[mar_Mrai] READ",
+        "mar_Mrai": "[mar_Mrai] READ"
     },
     "WRITE": {
         "hin_Deva": "[hin_Deva] WRITE",
         "tam_Taml": "[tam_Taml] WRITE",
         "tel_Telu": "[tel_Telu] WRITE",
         "ben_Beng": "[ben_Beng] WRITE",
-        "mar_Mrai": "[mar_Mrai] WRITE",
+        "mar_Mrai": "[mar_Mrai] WRITE"
     },
     "LISTEN": {
         "hin_Deva": "[hin_Deva] LISTEN",
         "tam_Taml": "[tam_Taml] LISTEN",
         "tel_Telu": "[tel_Telu] LISTEN",
         "ben_Beng": "[ben_Beng] LISTEN",
-        "mar_Mrai": "[mar_Mrai] LISTEN",
+        "mar_Mrai": "[mar_Mrai] LISTEN"
     },
     "WATCH": {
         "hin_Deva": "[hin_Deva] WATCH",
         "tam_Taml": "[tam_Taml] WATCH",
         "tel_Telu": "[tel_Telu] WATCH",
         "ben_Beng": "[ben_Beng] WATCH",
-        "mar_Mrai": "[mar_Mrai] WATCH",
+        "mar_Mrai": "[mar_Mrai] WATCH"
     },
     "SPEAK": {
         "hin_Deva": "[hin_Deva] SPEAK",
         "tam_Taml": "[tam_Taml] SPEAK",
         "tel_Telu": "[tel_Telu] SPEAK",
         "ben_Beng": "[ben_Beng] SPEAK",
-        "mar_Mrai": "[mar_Mrai] SPEAK",
+        "mar_Mrai": "[mar_Mrai] SPEAK"
     },
     "LEARN": {
         "hin_Deva": "[hin_Deva] LEARN",
         "tam_Taml": "[tam_Taml] LEARN",
         "tel_Telu": "[tel_Telu] LEARN",
         "ben_Beng": "[ben_Beng] LEARN",
-        "mar_Mrai": "[mar_Mrai] LEARN",
+        "mar_Mrai": "[mar_Mrai] LEARN"
     },
     "STUDY": {
         "hin_Deva": "[hin_Deva] STUDY",
         "tam_Taml": "[tam_Taml] STUDY",
         "tel_Telu": "[tel_Telu] STUDY",
         "ben_Beng": "[ben_Beng] STUDY",
-        "mar_Mrai": "[mar_Mrai] STUDY",
+        "mar_Mrai": "[mar_Mrai] STUDY"
     },
     "TEACH": {
         "hin_Deva": "[hin_Deva] TEACH",
         "tam_Taml": "[tam_Taml] TEACH",
         "tel_Telu": "[tel_Telu] TEACH",
         "ben_Beng": "[ben_Beng] TEACH",
-        "mar_Mrai": "[mar_Mrai] TEACH",
+        "mar_Mrai": "[mar_Mrai] TEACH"
     },
     "OPEN": {
         "hin_Deva": "[hin_Deva] OPEN",
         "tam_Taml": "[tam_Taml] OPEN",
         "tel_Telu": "[tel_Telu] OPEN",
         "ben_Beng": "[ben_Beng] OPEN",
-        "mar_Mrai": "[mar_Mrai] OPEN",
+        "mar_Mrai": "[mar_Mrai] OPEN"
     },
     "CLOSE": {
         "hin_Deva": "[hin_Deva] CLOSE",
         "tam_Taml": "[tam_Taml] CLOSE",
         "tel_Telu": "[tel_Telu] CLOSE",
         "ben_Beng": "[ben_Beng] CLOSE",
-        "mar_Mrai": "[mar_Mrai] CLOSE",
+        "mar_Mrai": "[mar_Mrai] CLOSE"
     },
     "SIT": {
         "hin_Deva": "[hin_Deva] SIT",
         "tam_Taml": "[tam_Taml] SIT",
         "tel_Telu": "[tel_Telu] SIT",
         "ben_Beng": "[ben_Beng] SIT",
-        "mar_Mrai": "[mar_Mrai] SIT",
+        "mar_Mrai": "[mar_Mrai] SIT"
     },
     "STAND": {
         "hin_Deva": "[hin_Deva] STAND",
         "tam_Taml": "[tam_Taml] STAND",
         "tel_Telu": "[tel_Telu] STAND",
         "ben_Beng": "[ben_Beng] STAND",
-        "mar_Mrai": "[mar_Mrai] STAND",
+        "mar_Mrai": "[mar_Mrai] STAND"
     },
     "COME": {
         "hin_Deva": "[hin_Deva] COME",
         "tam_Taml": "[tam_Taml] COME",
         "tel_Telu": "[tel_Telu] COME",
         "ben_Beng": "[ben_Beng] COME",
-        "mar_Mrai": "[mar_Mrai] COME",
+        "mar_Mrai": "[mar_Mrai] COME"
     },
     "GO": {
         "hin_Deva": "[hin_Deva] GO",
         "tam_Taml": "[tam_Taml] GO",
         "tel_Telu": "[tel_Telu] GO",
         "ben_Beng": "[ben_Beng] GO",
-        "mar_Mrai": "[mar_Mrai] GO",
+        "mar_Mrai": "[mar_Mrai] GO"
     },
     "ASK": {
         "hin_Deva": "[hin_Deva] ASK",
         "tam_Taml": "[tam_Taml] ASK",
         "tel_Telu": "[tel_Telu] ASK",
         "ben_Beng": "[ben_Beng] ASK",
-        "mar_Mrai": "[mar_Mrai] ASK",
+        "mar_Mrai": "[mar_Mrai] ASK"
     },
     "ANSWER": {
         "hin_Deva": "[hin_Deva] ANSWER",
         "tam_Taml": "[tam_Taml] ANSWER",
         "tel_Telu": "[tel_Telu] ANSWER",
         "ben_Beng": "[ben_Beng] ANSWER",
-        "mar_Mrai": "[mar_Mrai] ANSWER",
+        "mar_Mrai": "[mar_Mrai] ANSWER"
     },
     "EXPLAIN": {
         "hin_Deva": "[hin_Deva] EXPLAIN",
         "tam_Taml": "[tam_Taml] EXPLAIN",
         "tel_Telu": "[tel_Telu] EXPLAIN",
         "ben_Beng": "[ben_Beng] EXPLAIN",
-        "mar_Mrai": "[mar_Mrai] EXPLAIN",
+        "mar_Mrai": "[mar_Mrai] EXPLAIN"
     },
     "REPEAT": {
         "hin_Deva": "[hin_Deva] REPEAT",
         "tam_Taml": "[tam_Taml] REPEAT",
         "tel_Telu": "[tel_Telu] REPEAT",
         "ben_Beng": "[ben_Beng] REPEAT",
-        "mar_Mrai": "[mar_Mrai] REPEAT",
+        "mar_Mrai": "[mar_Mrai] REPEAT"
     },
     "HELP": {
         "hin_Deva": "मदद (Madad)",
         "tam_Taml": "உதவி (Uthavi)",
         "tel_Telu": "సహాయం (Sahayam)",
         "ben_Beng": "সাহায্য (Shahajjo)",
-        "mar_Mrai": "मदत (Madat)",
+        "mar_Mrai": "मदत (Madat)"
     },
     "PRACTICE": {
         "hin_Deva": "[hin_Deva] PRACTICE",
         "tam_Taml": "[tam_Taml] PRACTICE",
         "tel_Telu": "[tel_Telu] PRACTICE",
         "ben_Beng": "[ben_Beng] PRACTICE",
-        "mar_Mrai": "[mar_Mrai] PRACTICE",
+        "mar_Mrai": "[mar_Mrai] PRACTICE"
     },
     "UNDERSTAND": {
         "hin_Deva": "[hin_Deva] UNDERSTAND",
         "tam_Taml": "[tam_Taml] UNDERSTAND",
         "tel_Telu": "[tel_Telu] UNDERSTAND",
         "ben_Beng": "[ben_Beng] UNDERSTAND",
-        "mar_Mrai": "[mar_Mrai] UNDERSTAND",
+        "mar_Mrai": "[mar_Mrai] UNDERSTAND"
     },
     "REMEMBER": {
         "hin_Deva": "[hin_Deva] REMEMBER",
         "tam_Taml": "[tam_Taml] REMEMBER",
         "tel_Telu": "[tel_Telu] REMEMBER",
         "ben_Beng": "[ben_Beng] REMEMBER",
-        "mar_Mrai": "[mar_Mrai] REMEMBER",
+        "mar_Mrai": "[mar_Mrai] REMEMBER"
     },
     "FORGET": {
         "hin_Deva": "[hin_Deva] FORGET",
         "tam_Taml": "[tam_Taml] FORGET",
         "tel_Telu": "[tel_Telu] FORGET",
         "ben_Beng": "[ben_Beng] FORGET",
-        "mar_Mrai": "[mar_Mrai] FORGET",
+        "mar_Mrai": "[mar_Mrai] FORGET"
     },
     "THINK": {
         "hin_Deva": "[hin_Deva] THINK",
         "tam_Taml": "[tam_Taml] THINK",
         "tel_Telu": "[tel_Telu] THINK",
         "ben_Beng": "[ben_Beng] THINK",
-        "mar_Mrai": "[mar_Mrai] THINK",
+        "mar_Mrai": "[mar_Mrai] THINK"
     },
     "START": {
         "hin_Deva": "[hin_Deva] START",
         "tam_Taml": "[tam_Taml] START",
         "tel_Telu": "[tel_Telu] START",
         "ben_Beng": "[ben_Beng] START",
-        "mar_Mrai": "[mar_Mrai] START",
+        "mar_Mrai": "[mar_Mrai] START"
     },
     "FINISH": {
         "hin_Deva": "[hin_Deva] FINISH",
         "tam_Taml": "[tam_Taml] FINISH",
         "tel_Telu": "[tel_Telu] FINISH",
         "ben_Beng": "[ben_Beng] FINISH",
-        "mar_Mrai": "[mar_Mrai] FINISH",
+        "mar_Mrai": "[mar_Mrai] FINISH"
     },
     "SUBMIT": {
         "hin_Deva": "[hin_Deva] SUBMIT",
         "tam_Taml": "[tam_Taml] SUBMIT",
         "tel_Telu": "[tel_Telu] SUBMIT",
         "ben_Beng": "[ben_Beng] SUBMIT",
-        "mar_Mrai": "[mar_Mrai] SUBMIT",
+        "mar_Mrai": "[mar_Mrai] SUBMIT"
     },
     "CHECK": {
         "hin_Deva": "[hin_Deva] CHECK",
         "tam_Taml": "[tam_Taml] CHECK",
         "tel_Telu": "[tel_Telu] CHECK",
         "ben_Beng": "[ben_Beng] CHECK",
-        "mar_Mrai": "[mar_Mrai] CHECK",
+        "mar_Mrai": "[mar_Mrai] CHECK"
     },
     "CORRECT": {
         "hin_Deva": "[hin_Deva] CORRECT",
         "tam_Taml": "[tam_Taml] CORRECT",
         "tel_Telu": "[tel_Telu] CORRECT",
         "ben_Beng": "[ben_Beng] CORRECT",
-        "mar_Mrai": "[mar_Mrai] CORRECT",
+        "mar_Mrai": "[mar_Mrai] CORRECT"
     },
     "DRAW": {
         "hin_Deva": "[hin_Deva] DRAW",
         "tam_Taml": "[tam_Taml] DRAW",
         "tel_Telu": "[tel_Telu] DRAW",
         "ben_Beng": "[ben_Beng] DRAW",
-        "mar_Mrai": "[mar_Mrai] DRAW",
+        "mar_Mrai": "[mar_Mrai] DRAW"
     },
     "COUNT": {
         "hin_Deva": "[hin_Deva] COUNT",
         "tam_Taml": "[tam_Taml] COUNT",
         "tel_Telu": "[tel_Telu] COUNT",
         "ben_Beng": "[ben_Beng] COUNT",
-        "mar_Mrai": "[mar_Mrai] COUNT",
+        "mar_Mrai": "[mar_Mrai] COUNT"
     },
     "SOLVE": {
         "hin_Deva": "[hin_Deva] SOLVE",
         "tam_Taml": "[tam_Taml] SOLVE",
         "tel_Telu": "[tel_Telu] SOLVE",
         "ben_Beng": "[ben_Beng] SOLVE",
-        "mar_Mrai": "[mar_Mrai] SOLVE",
+        "mar_Mrai": "[mar_Mrai] SOLVE"
     },
     "SHARE": {
         "hin_Deva": "[hin_Deva] SHARE",
         "tam_Taml": "[tam_Taml] SHARE",
         "tel_Telu": "[tel_Telu] SHARE",
         "ben_Beng": "[ben_Beng] SHARE",
-        "mar_Mrai": "[mar_Mrai] SHARE",
+        "mar_Mrai": "[mar_Mrai] SHARE"
     },
     "CLEAN": {
         "hin_Deva": "[hin_Deva] CLEAN",
         "tam_Taml": "[tam_Taml] CLEAN",
         "tel_Telu": "[tel_Telu] CLEAN",
         "ben_Beng": "[ben_Beng] CLEAN",
-        "mar_Mrai": "[mar_Mrai] CLEAN",
+        "mar_Mrai": "[mar_Mrai] CLEAN"
     },
     "WAIT": {
         "hin_Deva": "[hin_Deva] WAIT",
         "tam_Taml": "[tam_Taml] WAIT",
         "tel_Telu": "[tel_Telu] WAIT",
         "ben_Beng": "[ben_Beng] WAIT",
-        "mar_Mrai": "[mar_Mrai] WAIT",
+        "mar_Mrai": "[mar_Mrai] WAIT"
     },
     "WHAT": {
         "hin_Deva": "[hin_Deva] WHAT",
         "tam_Taml": "[tam_Taml] WHAT",
         "tel_Telu": "[tel_Telu] WHAT",
         "ben_Beng": "[ben_Beng] WHAT",
-        "mar_Mrai": "[mar_Mrai] WHAT",
+        "mar_Mrai": "[mar_Mrai] WHAT"
     },
     "WHERE": {
         "hin_Deva": "[hin_Deva] WHERE",
         "tam_Taml": "[tam_Taml] WHERE",
         "tel_Telu": "[tel_Telu] WHERE",
         "ben_Beng": "[ben_Beng] WHERE",
-        "mar_Mrai": "[mar_Mrai] WHERE",
+        "mar_Mrai": "[mar_Mrai] WHERE"
     },
     "WHEN": {
         "hin_Deva": "[hin_Deva] WHEN",
         "tam_Taml": "[tam_Taml] WHEN",
         "tel_Telu": "[tel_Telu] WHEN",
         "ben_Beng": "[ben_Beng] WHEN",
-        "mar_Mrai": "[mar_Mrai] WHEN",
+        "mar_Mrai": "[mar_Mrai] WHEN"
     },
     "WHY": {
         "hin_Deva": "[hin_Deva] WHY",
         "tam_Taml": "[tam_Taml] WHY",
         "tel_Telu": "[tel_Telu] WHY",
         "ben_Beng": "[ben_Beng] WHY",
-        "mar_Mrai": "[mar_Mrai] WHY",
+        "mar_Mrai": "[mar_Mrai] WHY"
     },
     "WHO": {
         "hin_Deva": "[hin_Deva] WHO",
         "tam_Taml": "[tam_Taml] WHO",
         "tel_Telu": "[tel_Telu] WHO",
         "ben_Beng": "[ben_Beng] WHO",
-        "mar_Mrai": "[mar_Mrai] WHO",
+        "mar_Mrai": "[mar_Mrai] WHO"
     },
     "WHICH": {
         "hin_Deva": "[hin_Deva] WHICH",
         "tam_Taml": "[tam_Taml] WHICH",
         "tel_Telu": "[tel_Telu] WHICH",
         "ben_Beng": "[ben_Beng] WHICH",
-        "mar_Mrai": "[mar_Mrai] WHICH",
+        "mar_Mrai": "[mar_Mrai] WHICH"
     },
     "HOW": {
         "hin_Deva": "[hin_Deva] HOW",
         "tam_Taml": "[tam_Taml] HOW",
         "tel_Telu": "[tel_Telu] HOW",
         "ben_Beng": "[ben_Beng] HOW",
-        "mar_Mrai": "[mar_Mrai] HOW",
+        "mar_Mrai": "[mar_Mrai] HOW"
     },
     "HOW_MANY": {
         "hin_Deva": "[hin_Deva] HOW_MANY",
         "tam_Taml": "[tam_Taml] HOW_MANY",
         "tel_Telu": "[tel_Telu] HOW_MANY",
         "ben_Beng": "[ben_Beng] HOW_MANY",
-        "mar_Mrai": "[mar_Mrai] HOW_MANY",
+        "mar_Mrai": "[mar_Mrai] HOW_MANY"
     },
     "HOW_MUCH": {
         "hin_Deva": "[hin_Deva] HOW_MUCH",
         "tam_Taml": "[tam_Taml] HOW_MUCH",
         "tel_Telu": "[tel_Telu] HOW_MUCH",
         "ben_Beng": "[ben_Beng] HOW_MUCH",
-        "mar_Mrai": "[mar_Mrai] HOW_MUCH",
+        "mar_Mrai": "[mar_Mrai] HOW_MUCH"
     },
     "REASON": {
         "hin_Deva": "[hin_Deva] REASON",
         "tam_Taml": "[tam_Taml] REASON",
         "tel_Telu": "[tel_Telu] REASON",
         "ben_Beng": "[ben_Beng] REASON",
-        "mar_Mrai": "[mar_Mrai] REASON",
+        "mar_Mrai": "[mar_Mrai] REASON"
     },
     "HELLO": {
         "hin_Deva": "[hin_Deva] HELLO",
         "tam_Taml": "[tam_Taml] HELLO",
         "tel_Telu": "[tel_Telu] HELLO",
         "ben_Beng": "[ben_Beng] HELLO",
-        "mar_Mrai": "[mar_Mrai] HELLO",
+        "mar_Mrai": "[mar_Mrai] HELLO"
     },
     "GOODBYE": {
         "hin_Deva": "[hin_Deva] GOODBYE",
         "tam_Taml": "[tam_Taml] GOODBYE",
         "tel_Telu": "[tel_Telu] GOODBYE",
         "ben_Beng": "[ben_Beng] GOODBYE",
-        "mar_Mrai": "[mar_Mrai] GOODBYE",
+        "mar_Mrai": "[mar_Mrai] GOODBYE"
     },
     "PLEASE": {
         "hin_Deva": "[hin_Deva] PLEASE",
         "tam_Taml": "[tam_Taml] PLEASE",
         "tel_Telu": "[tel_Telu] PLEASE",
         "ben_Beng": "[ben_Beng] PLEASE",
-        "mar_Mrai": "[mar_Mrai] PLEASE",
+        "mar_Mrai": "[mar_Mrai] PLEASE"
     },
     "THANK_YOU": {
         "hin_Deva": "धन्यवाद (Dhanyavaad)",
         "tam_Taml": "நன்றி (Nandri)",
         "tel_Telu": "ధన్యవాదాలు (Dhanyavadalu)",
         "ben_Beng": "ধন্যবাদ (Dhonnobad)",
-        "mar_Mrai": "धन्यवाद (Dhanyavaad)",
+        "mar_Mrai": "धन्यवाद (Dhanyavaad)"
     },
     "WELCOME": {
         "hin_Deva": "[hin_Deva] WELCOME",
         "tam_Taml": "[tam_Taml] WELCOME",
         "tel_Telu": "[tel_Telu] WELCOME",
         "ben_Beng": "[ben_Beng] WELCOME",
-        "mar_Mrai": "[mar_Mrai] WELCOME",
+        "mar_Mrai": "[mar_Mrai] WELCOME"
     },
     "SORRY": {
         "hin_Deva": "[hin_Deva] SORRY",
         "tam_Taml": "[tam_Taml] SORRY",
         "tel_Telu": "[tel_Telu] SORRY",
         "ben_Beng": "[ben_Beng] SORRY",
-        "mar_Mrai": "[mar_Mrai] SORRY",
+        "mar_Mrai": "[mar_Mrai] SORRY"
     },
     "EXCUSE_ME": {
         "hin_Deva": "[hin_Deva] EXCUSE_ME",
         "tam_Taml": "[tam_Taml] EXCUSE_ME",
         "tel_Telu": "[tel_Telu] EXCUSE_ME",
         "ben_Beng": "[ben_Beng] EXCUSE_ME",
-        "mar_Mrai": "[mar_Mrai] EXCUSE_ME",
+        "mar_Mrai": "[mar_Mrai] EXCUSE_ME"
     },
     "YES": {
         "hin_Deva": "हाँ (Haan)",
         "tam_Taml": "ஆம் (Aam)",
         "tel_Telu": "అవును (Avunu)",
         "ben_Beng": "হ্যাঁ (Hya)",
-        "mar_Mrai": "हो (Ho)",
+        "mar_Mrai": "हो (Ho)"
     },
     "NO": {
         "hin_Deva": "नहीं (Nahi)",
         "tam_Taml": "இல்லை (Illai)",
         "tel_Telu": "కాదు (Kaadhu)",
         "ben_Beng": "না (Na)",
-        "mar_Mrai": "नाही (Naahi)",
+        "mar_Mrai": "नाही (Naahi)"
     },
     "GOOD": {
         "hin_Deva": "[hin_Deva] GOOD",
         "tam_Taml": "[tam_Taml] GOOD",
         "tel_Telu": "[tel_Telu] GOOD",
         "ben_Beng": "[ben_Beng] GOOD",
-        "mar_Mrai": "[mar_Mrai] GOOD",
+        "mar_Mrai": "[mar_Mrai] GOOD"
     },
     "BAD": {
         "hin_Deva": "[hin_Deva] BAD",
         "tam_Taml": "[tam_Taml] BAD",
         "tel_Telu": "[tel_Telu] BAD",
         "ben_Beng": "[ben_Beng] BAD",
-        "mar_Mrai": "[mar_Mrai] BAD",
+        "mar_Mrai": "[mar_Mrai] BAD"
     },
     "CORRECT_ANSWER": {
         "hin_Deva": "[hin_Deva] CORRECT_ANSWER",
         "tam_Taml": "[tam_Taml] CORRECT_ANSWER",
         "tel_Telu": "[tel_Telu] CORRECT_ANSWER",
         "ben_Beng": "[ben_Beng] CORRECT_ANSWER",
-        "mar_Mrai": "[mar_Mrai] CORRECT_ANSWER",
+        "mar_Mrai": "[mar_Mrai] CORRECT_ANSWER"
     },
     "WRONG_ANSWER": {
         "hin_Deva": "[hin_Deva] WRONG_ANSWER",
         "tam_Taml": "[tam_Taml] WRONG_ANSWER",
         "tel_Telu": "[tel_Telu] WRONG_ANSWER",
         "ben_Beng": "[ben_Beng] WRONG_ANSWER",
-        "mar_Mrai": "[mar_Mrai] WRONG_ANSWER",
+        "mar_Mrai": "[mar_Mrai] WRONG_ANSWER"
     },
     "AGREE": {
         "hin_Deva": "[hin_Deva] AGREE",
         "tam_Taml": "[tam_Taml] AGREE",
         "tel_Telu": "[tel_Telu] AGREE",
         "ben_Beng": "[ben_Beng] AGREE",
-        "mar_Mrai": "[mar_Mrai] AGREE",
+        "mar_Mrai": "[mar_Mrai] AGREE"
     },
     "DISAGREE": {
         "hin_Deva": "[hin_Deva] DISAGREE",
         "tam_Taml": "[tam_Taml] DISAGREE",
         "tel_Telu": "[tel_Telu] DISAGREE",
         "ben_Beng": "[ben_Beng] DISAGREE",
-        "mar_Mrai": "[mar_Mrai] DISAGREE",
+        "mar_Mrai": "[mar_Mrai] DISAGREE"
     },
     "TODAY": {
         "hin_Deva": "[hin_Deva] TODAY",
         "tam_Taml": "[tam_Taml] TODAY",
         "tel_Telu": "[tel_Telu] TODAY",
         "ben_Beng": "[ben_Beng] TODAY",
-        "mar_Mrai": "[mar_Mrai] TODAY",
+        "mar_Mrai": "[mar_Mrai] TODAY"
     },
     "TOMORROW": {
         "hin_Deva": "[hin_Deva] TOMORROW",
         "tam_Taml": "[tam_Taml] TOMORROW",
         "tel_Telu": "[tel_Telu] TOMORROW",
         "ben_Beng": "[ben_Beng] TOMORROW",
-        "mar_Mrai": "[mar_Mrai] TOMORROW",
+        "mar_Mrai": "[mar_Mrai] TOMORROW"
     },
     "YESTERDAY": {
         "hin_Deva": "[hin_Deva] YESTERDAY",
         "tam_Taml": "[tam_Taml] YESTERDAY",
         "tel_Telu": "[tel_Telu] YESTERDAY",
         "ben_Beng": "[ben_Beng] YESTERDAY",
-        "mar_Mrai": "[mar_Mrai] YESTERDAY",
+        "mar_Mrai": "[mar_Mrai] YESTERDAY"
     },
     "NOW": {
         "hin_Deva": "[hin_Deva] NOW",
         "tam_Taml": "[tam_Taml] NOW",
         "tel_Telu": "[tel_Telu] NOW",
         "ben_Beng": "[ben_Beng] NOW",
-        "mar_Mrai": "[mar_Mrai] NOW",
+        "mar_Mrai": "[mar_Mrai] NOW"
     },
     "LATER": {
         "hin_Deva": "[hin_Deva] LATER",
         "tam_Taml": "[tam_Taml] LATER",
         "tel_Telu": "[tel_Telu] LATER",
         "ben_Beng": "[ben_Beng] LATER",
-        "mar_Mrai": "[mar_Mrai] LATER",
+        "mar_Mrai": "[mar_Mrai] LATER"
     },
     "MORNING": {
         "hin_Deva": "[hin_Deva] MORNING",
         "tam_Taml": "[tam_Taml] MORNING",
         "tel_Telu": "[tel_Telu] MORNING",
         "ben_Beng": "[ben_Beng] MORNING",
-        "mar_Mrai": "[mar_Mrai] MORNING",
+        "mar_Mrai": "[mar_Mrai] MORNING"
     },
     "AFTERNOON": {
         "hin_Deva": "[hin_Deva] AFTERNOON",
         "tam_Taml": "[tam_Taml] AFTERNOON",
         "tel_Telu": "[tel_Telu] AFTERNOON",
         "ben_Beng": "[ben_Beng] AFTERNOON",
-        "mar_Mrai": "[mar_Mrai] AFTERNOON",
+        "mar_Mrai": "[mar_Mrai] AFTERNOON"
     },
     "EVENING": {
         "hin_Deva": "[hin_Deva] EVENING",
         "tam_Taml": "[tam_Taml] EVENING",
         "tel_Telu": "[tel_Telu] EVENING",
         "ben_Beng": "[ben_Beng] EVENING",
-        "mar_Mrai": "[mar_Mrai] EVENING",
+        "mar_Mrai": "[mar_Mrai] EVENING"
     },
     "NIGHT": {
         "hin_Deva": "[hin_Deva] NIGHT",
         "tam_Taml": "[tam_Taml] NIGHT",
         "tel_Telu": "[tel_Telu] NIGHT",
         "ben_Beng": "[ben_Beng] NIGHT",
-        "mar_Mrai": "[mar_Mrai] NIGHT",
+        "mar_Mrai": "[mar_Mrai] NIGHT"
     },
     "PERIOD": {
         "hin_Deva": "[hin_Deva] PERIOD",
         "tam_Taml": "[tam_Taml] PERIOD",
         "tel_Telu": "[tel_Telu] PERIOD",
         "ben_Beng": "[ben_Beng] PERIOD",
-        "mar_Mrai": "[mar_Mrai] PERIOD",
+        "mar_Mrai": "[mar_Mrai] PERIOD"
     },
     "BREAK": {
         "hin_Deva": "[hin_Deva] BREAK",
         "tam_Taml": "[tam_Taml] BREAK",
         "tel_Telu": "[tel_Telu] BREAK",
         "ben_Beng": "[ben_Beng] BREAK",
-        "mar_Mrai": "[mar_Mrai] BREAK",
+        "mar_Mrai": "[mar_Mrai] BREAK"
     },
     "LUNCH": {
         "hin_Deva": "[hin_Deva] LUNCH",
         "tam_Taml": "[tam_Taml] LUNCH",
         "tel_Telu": "[tel_Telu] LUNCH",
         "ben_Beng": "[ben_Beng] LUNCH",
-        "mar_Mrai": "[mar_Mrai] LUNCH",
+        "mar_Mrai": "[mar_Mrai] LUNCH"
     },
     "HOLIDAY": {
         "hin_Deva": "[hin_Deva] HOLIDAY",
         "tam_Taml": "[tam_Taml] HOLIDAY",
         "tel_Telu": "[tel_Telu] HOLIDAY",
         "ben_Beng": "[ben_Beng] HOLIDAY",
-        "mar_Mrai": "[mar_Mrai] HOLIDAY",
+        "mar_Mrai": "[mar_Mrai] HOLIDAY"
     },
     "ATTENDANCE": {
         "hin_Deva": "[hin_Deva] ATTENDANCE",
         "tam_Taml": "[tam_Taml] ATTENDANCE",
         "tel_Telu": "[tel_Telu] ATTENDANCE",
         "ben_Beng": "[ben_Beng] ATTENDANCE",
-        "mar_Mrai": "[mar_Mrai] ATTENDANCE",
+        "mar_Mrai": "[mar_Mrai] ATTENDANCE"
     },
     "TIME": {
         "hin_Deva": "[hin_Deva] TIME",
         "tam_Taml": "[tam_Taml] TIME",
         "tel_Telu": "[tel_Telu] TIME",
         "ben_Beng": "[ben_Beng] TIME",
-        "mar_Mrai": "[mar_Mrai] TIME",
+        "mar_Mrai": "[mar_Mrai] TIME"
     },
     "HAPPY": {
         "hin_Deva": "[hin_Deva] HAPPY",
         "tam_Taml": "[tam_Taml] HAPPY",
         "tel_Telu": "[tel_Telu] HAPPY",
         "ben_Beng": "[ben_Beng] HAPPY",
-        "mar_Mrai": "[mar_Mrai] HAPPY",
+        "mar_Mrai": "[mar_Mrai] HAPPY"
     },
     "SAD": {
         "hin_Deva": "[hin_Deva] SAD",
         "tam_Taml": "[tam_Taml] SAD",
         "tel_Telu": "[tel_Telu] SAD",
         "ben_Beng": "[ben_Beng] SAD",
-        "mar_Mrai": "[mar_Mrai] SAD",
+        "mar_Mrai": "[mar_Mrai] SAD"
     },
     "CONFUSED": {
         "hin_Deva": "[hin_Deva] CONFUSED",
         "tam_Taml": "[tam_Taml] CONFUSED",
         "tel_Telu": "[tel_Telu] CONFUSED",
         "ben_Beng": "[ben_Beng] CONFUSED",
-        "mar_Mrai": "[mar_Mrai] CONFUSED",
+        "mar_Mrai": "[mar_Mrai] CONFUSED"
     },
     "TIRED": {
         "hin_Deva": "[hin_Deva] TIRED",
         "tam_Taml": "[tam_Taml] TIRED",
         "tel_Telu": "[tel_Telu] TIRED",
         "ben_Beng": "[ben_Beng] TIRED",
-        "mar_Mrai": "[mar_Mrai] TIRED",
+        "mar_Mrai": "[mar_Mrai] TIRED"
     },
     "EXCITED": {
         "hin_Deva": "[hin_Deva] EXCITED",
         "tam_Taml": "[tam_Taml] EXCITED",
         "tel_Telu": "[tel_Telu] EXCITED",
         "ben_Beng": "[ben_Beng] EXCITED",
-        "mar_Mrai": "[mar_Mrai] EXCITED",
+        "mar_Mrai": "[mar_Mrai] EXCITED"
     },
     "QUIET": {
         "hin_Deva": "[hin_Deva] QUIET",
         "tam_Taml": "[tam_Taml] QUIET",
         "tel_Telu": "[tel_Telu] QUIET",
         "ben_Beng": "[ben_Beng] QUIET",
-        "mar_Mrai": "[mar_Mrai] QUIET",
+        "mar_Mrai": "[mar_Mrai] QUIET"
     },
     "LOUD": {
         "hin_Deva": "[hin_Deva] LOUD",
         "tam_Taml": "[tam_Taml] LOUD",
         "tel_Telu": "[tel_Telu] LOUD",
         "ben_Beng": "[ben_Beng] LOUD",
-        "mar_Mrai": "[mar_Mrai] LOUD",
+        "mar_Mrai": "[mar_Mrai] LOUD"
     },
     "FAST": {
         "hin_Deva": "[hin_Deva] FAST",
         "tam_Taml": "[tam_Taml] FAST",
         "tel_Telu": "[tel_Telu] FAST",
         "ben_Beng": "[ben_Beng] FAST",
-        "mar_Mrai": "[mar_Mrai] FAST",
+        "mar_Mrai": "[mar_Mrai] FAST"
     },
     "SLOW": {
         "hin_Deva": "[hin_Deva] SLOW",
         "tam_Taml": "[tam_Taml] SLOW",
         "tel_Telu": "[tel_Telu] SLOW",
         "ben_Beng": "[ben_Beng] SLOW",
-        "mar_Mrai": "[mar_Mrai] SLOW",
+        "mar_Mrai": "[mar_Mrai] SLOW"
     },
     "EASY": {
         "hin_Deva": "[hin_Deva] EASY",
         "tam_Taml": "[tam_Taml] EASY",
         "tel_Telu": "[tel_Telu] EASY",
         "ben_Beng": "[ben_Beng] EASY",
-        "mar_Mrai": "[mar_Mrai] EASY",
+        "mar_Mrai": "[mar_Mrai] EASY"
     },
     "DIFFICULT": {
         "hin_Deva": "[hin_Deva] DIFFICULT",
         "tam_Taml": "[tam_Taml] DIFFICULT",
         "tel_Telu": "[tel_Telu] DIFFICULT",
         "ben_Beng": "[ben_Beng] DIFFICULT",
-        "mar_Mrai": "[mar_Mrai] DIFFICULT",
+        "mar_Mrai": "[mar_Mrai] DIFFICULT"
     },
     "IMPORTANT": {
         "hin_Deva": "[hin_Deva] IMPORTANT",
         "tam_Taml": "[tam_Taml] IMPORTANT",
         "tel_Telu": "[tel_Telu] IMPORTANT",
         "ben_Beng": "[ben_Beng] IMPORTANT",
-        "mar_Mrai": "[mar_Mrai] IMPORTANT",
+        "mar_Mrai": "[mar_Mrai] IMPORTANT"
     },
     "READY": {
         "hin_Deva": "[hin_Deva] READY",
         "tam_Taml": "[tam_Taml] READY",
         "tel_Telu": "[tel_Telu] READY",
         "ben_Beng": "[ben_Beng] READY",
-        "mar_Mrai": "[mar_Mrai] READY",
+        "mar_Mrai": "[mar_Mrai] READY"
     },
     "CLEAR": {
         "hin_Deva": "[hin_Deva] CLEAR",
         "tam_Taml": "[tam_Taml] CLEAR",
         "tel_Telu": "[tel_Telu] CLEAR",
         "ben_Beng": "[ben_Beng] CLEAR",
-        "mar_Mrai": "[mar_Mrai] CLEAR",
+        "mar_Mrai": "[mar_Mrai] CLEAR"
     },
     "DOUBT": {
         "hin_Deva": "[hin_Deva] DOUBT",
         "tam_Taml": "[tam_Taml] DOUBT",
         "tel_Telu": "[tel_Telu] DOUBT",
         "ben_Beng": "[ben_Beng] DOUBT",
-        "mar_Mrai": "[mar_Mrai] DOUBT",
+        "mar_Mrai": "[mar_Mrai] DOUBT"
     },
     "SMART": {
         "hin_Deva": "[hin_Deva] SMART",
         "tam_Taml": "[tam_Taml] SMART",
         "tel_Telu": "[tel_Telu] SMART",
         "ben_Beng": "[ben_Beng] SMART",
-        "mar_Mrai": "[mar_Mrai] SMART",
+        "mar_Mrai": "[mar_Mrai] SMART"
     },
     "HARDWORKING": {
         "hin_Deva": "[hin_Deva] HARDWORKING",
         "tam_Taml": "[tam_Taml] HARDWORKING",
         "tel_Telu": "[tel_Telu] HARDWORKING",
         "ben_Beng": "[ben_Beng] HARDWORKING",
-        "mar_Mrai": "[mar_Mrai] HARDWORKING",
+        "mar_Mrai": "[mar_Mrai] HARDWORKING"
     },
     "SAFE": {
         "hin_Deva": "[hin_Deva] SAFE",
         "tam_Taml": "[tam_Taml] SAFE",
         "tel_Telu": "[tel_Telu] SAFE",
         "ben_Beng": "[ben_Beng] SAFE",
-        "mar_Mrai": "[mar_Mrai] SAFE",
+        "mar_Mrai": "[mar_Mrai] SAFE"
     },
     "SUCCESS": {
         "hin_Deva": "[hin_Deva] SUCCESS",
         "tam_Taml": "[tam_Taml] SUCCESS",
         "tel_Telu": "[tel_Telu] SUCCESS",
         "ben_Beng": "[ben_Beng] SUCCESS",
-        "mar_Mrai": "[mar_Mrai] SUCCESS",
-    },
+        "mar_Mrai": "[mar_Mrai] SUCCESS"
+    }
 }
-
-
-class RegionalSynthesisEngine:
-    """Multilingual Regional Translation (AI4Bharat IndicTrans2) & Voice Synthesis (VITS/Rasa).
-
-    Provides high-throughput translation across 22 Indian regional languages with
-    sub-40ms translation targets and audio waveform synthesis.
-    """
-
-    def __init__(self, config: Optional[SynthesisConfig] = None):
-        self.config = config or SynthesisConfig()
-        self.mock_offline = self.config.mock_offline
-        self._nmt_model = None
-        self._nmt_tokenizer = None
-        self._tts_model = None
-
-    def translate_text(
-        self,
-        text: str,
-        target_lang: str = "hin_Deva",
-        source_lang: str = "eng_Latn",
-    ) -> Dict[str, Any]:
-        """Translates English or gloss text into the target Indian regional language."""
-        start_time = time.perf_counter()
-        clean_key = text.strip().upper().replace(" ", "_")
-
-        # Fast path: Check offline educational dictionary
-        if clean_key in OFFLINE_CLASSROOM_LEXICON and target_lang in OFFLINE_CLASSROOM_LEXICON[clean_key]:
-            translated = OFFLINE_CLASSROOM_LEXICON[clean_key][target_lang]
-            latency_ms = (time.perf_counter() - start_time) * 1000.0
-            return {
-                "source_text": text,
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "translated_text": translated,
-                "latency_ms": latency_ms,
-                "engine": "offline_lexicon",
-            }
-
-        # Fallback / General NMT path
-        # In mock offline mode or when external heavy weights are not loaded:
-        translated = f"[{target_lang}] {text}"
-        latency_ms = (time.perf_counter() - start_time) * 1000.0
-
-        return {
-            "source_text": text,
-            "source_lang": source_lang,
-            "target_lang": target_lang,
-            "translated_text": translated,
-            "latency_ms": latency_ms,
-            "engine": "mock_indictrans2" if self.mock_offline else "indictrans2_dist_200m",
-        }
-
-    def synthesize_speech(
-        self,
-        text: str,
-        target_lang: str = "hin_Deva",
-        gender: str = "female",
-    ) -> Dict[str, Any]:
-        """Synthesizes regional text into audio waveform format (AI4Bharat VITS/Rasa)."""
-        start_time = time.perf_counter()
-
-        # Generate audio duration estimate & synthetic PCM buffer in mock mode
-        # 1 word ~ 0.35 seconds of speech
-        word_count = max(1, len(text.split()))
-        audio_duration_sec = word_count * 0.35
-
-        latency_ms = (time.perf_counter() - start_time) * 1000.0
-
-        return {
-            "text": text,
-            "target_lang": target_lang,
-            "gender": gender,
-            "sampling_rate": 22050,
-            "audio_duration_sec": audio_duration_sec,
-            "latency_ms": latency_ms,
-            "engine": "mock_vits" if self.mock_offline else "ai4bharat_vits_indic",
-            "audio_format": "wav",
-        }
-
-    def process_multilingual_pipeline(
-        self,
-        sign_gloss: str,
-        target_languages: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        """Executes full translation + TTS synthesis across all requested regional languages."""
-        start_time = time.perf_counter()
-        targets = target_languages or self.config.target_languages
-
-        results: Dict[str, Any] = {}
-        for lang in targets:
-            trans = self.translate_text(sign_gloss, target_lang=lang, source_lang=self.config.source_language)
-            tts = self.synthesize_speech(trans["translated_text"], target_lang=lang) if self.config.enable_tts else None
-            results[lang] = {
-                "translation": trans["translated_text"],
-                "translation_latency_ms": trans["latency_ms"],
-                "tts": tts,
-            }
-
-        total_latency_ms = (time.perf_counter() - start_time) * 1000.0
-        return {
-            "sign_gloss": sign_gloss,
-            "languages": results,
-            "total_synthesis_latency_ms": total_latency_ms,
-        }

@@ -50,6 +50,11 @@ def build_76_keypoint_adjacency() -> torch.Tensor:
         (46, 48),  # Right arm
         (47, 0),  # Connect left wrist to left hand
         (48, 21),  # Connect right wrist to right hand
+        (43, 49),  # Left shoulder to left hip
+        (44, 50),  # Right shoulder to right hip
+        (49, 50),  # Left hip to right hip
+        (42, 51),  # Nose to left eye inner
+        (42, 52),  # Nose to right eye inner
     ]
     for u, v in pose_edges:
         if u < num_nodes and v < num_nodes:
@@ -57,11 +62,37 @@ def build_76_keypoint_adjacency() -> torch.Tensor:
             adj[v, u] = 1.0
 
     # Face connections (53..75) - connect adjacent NMM points and anchor to head/nose (42)
-    for i in range(53, 75):
+    # Face connections (53..75) - Anatomically correct sub-graphs
+    # Left Eyebrow (53-57)
+    for i in range(53, 57):
         adj[i, i + 1] = 1.0
         adj[i + 1, i] = 1.0
     adj[42, 53] = 1.0
     adj[53, 42] = 1.0
+
+    # Right Eyebrow (58-62)
+    for i in range(58, 62):
+        adj[i, i + 1] = 1.0
+        adj[i + 1, i] = 1.0
+    adj[42, 58] = 1.0
+    adj[58, 42] = 1.0
+
+    # Left Eye (63-64)
+    adj[63, 64] = 1.0
+    adj[64, 63] = 1.0
+    adj[42, 63] = 1.0
+    adj[63, 42] = 1.0
+
+    # Right Eye (65-66)
+    adj[65, 66] = 1.0
+    adj[66, 65] = 1.0
+    adj[42, 65] = 1.0
+    adj[65, 42] = 1.0
+
+    # Mouth contour (67-75)
+    for i in range(67, 75):
+        adj[i, i + 1] = 1.0
+        adj[i + 1, i] = 1.0
 
     # Degree normalization: D^(-1/2) * A * D^(-1/2)
     deg = torch.sum(adj, dim=1)
