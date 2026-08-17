@@ -225,7 +225,9 @@ def run_webcam_stream(
     cap = cv2.VideoCapture(camera_id)
     if not cap.isOpened():
         print(f"Error: Unable to open webcam on index {camera_id}.", flush=True)
-        print("Tip: If you have an external webcam or virtual camera, try passing --camera 1 or --camera 2.", flush=True)
+        print(
+            "Tip: If you have an external webcam or virtual camera, try passing --camera 1 or --camera 2.", flush=True
+        )
         return
 
     # Set frame resolution

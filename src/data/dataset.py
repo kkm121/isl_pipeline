@@ -175,6 +175,30 @@ CLASSROOM_VOCABULARY_200 = [
     "HARDWORKING",
     "SAFE",
     "SUCCESS",
+    # Colors (7)
+    "RED",
+    "BLUE",
+    "GREEN",
+    "YELLOW",
+    "ORANGE",
+    "BLACK",
+    "WHITE",
+    # Spatial Directions (7)
+    "UP",
+    "DOWN",
+    "LEFT",
+    "RIGHT",
+    "FRONT",
+    "BACK",
+    "NEAR",
+    # Academic & Classroom Concepts (7)
+    "QUESTION",
+    "SENTENCE",
+    "WORD",
+    "NUMBER",
+    "RESULT",
+    "GRADE",
+    "GOAL",
 ]
 
 

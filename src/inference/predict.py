@@ -161,7 +161,9 @@ class StreamingSignPredictor:
         top_k = [
             {
                 "class_id": int(idx.item()),
-                "class_name": self.class_names[int(idx.item())] if int(idx.item()) < len(self.class_names) else f"CLASS_{int(idx.item())}",
+                "class_name": self.class_names[int(idx.item())]
+                if int(idx.item()) < len(self.class_names)
+                else f"CLASS_{int(idx.item())}",
                 "confidence": float(prob.item()),
             }
             for prob, idx in zip(top_k_probs, top_k_indices)

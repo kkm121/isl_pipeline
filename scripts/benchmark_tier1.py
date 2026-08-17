@@ -291,7 +291,9 @@ def main():
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--device", type=str, default="cpu", help="Device (cpu/cuda)")
-    parser.add_argument("--output-json", type=str, default="metrics/tier1_synthetic_benchmark.json", help="Output JSON path")
+    parser.add_argument(
+        "--output-json", type=str, default="metrics/tier1_synthetic_benchmark.json", help="Output JSON path"
+    )
 
     args = parser.parse_args()
     run_benchmark(args)

@@ -248,9 +248,7 @@ class SignFormerGCN(nn.Module):
 
         # ST-GCN Front-End
         self.stgcn1 = STGCNBlock(self.config.in_channels, self.config.graph_hidden_dim // 2, self.config.num_nodes)
-        self.stgcn2 = STGCNBlock(
-            self.config.graph_hidden_dim // 2, self.config.graph_hidden_dim, self.config.num_nodes
-        )
+        self.stgcn2 = STGCNBlock(self.config.graph_hidden_dim // 2, self.config.graph_hidden_dim, self.config.num_nodes)
 
         # Spatial pooling across 76 skeleton nodes -> graph feature vector
         self.proj_to_transformer = nn.Linear(self.config.graph_hidden_dim, self.config.transformer_d_model)
