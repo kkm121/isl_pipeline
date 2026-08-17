@@ -261,7 +261,7 @@ OFFLINE_CLASSROOM_LEXICON: Dict[str, Dict[str, str]] = {
         "mar_Mrai": "नऊ",
     },
     "TEACHER": {
-        "hin_Deva": "शिक्षक",
+        "hin_Deva": "अध्यापक (शिक्षक)",
         "tam_Taml": "ஆசிரியர்",
         "tel_Telu": "ఉపాధ్యాయుడు",
         "ben_Beng": "শিক্ষক",
