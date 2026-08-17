@@ -17,6 +17,8 @@ dependencies = [
     "pandas",
     "scikit-learn",
     "pyyaml",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
     "tqdm",
     "tensorboard"
 ]
@@ -24,9 +26,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "mypy",
     "ruff",
     "fastmcp",
+    "mcp",
     "types-PyYAML"
 ]
 

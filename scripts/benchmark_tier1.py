@@ -54,7 +54,6 @@ def generate_benchmark_data(
     # Signer-specific anatomical bias & speed scaling
     signer_biases = {f"signer_{i}": np.random.randn(num_landmarks, 3) * 0.1 for i in range(num_signers)}
 
-
     sequences = []
     labels = []
     signer_ids = []
@@ -210,12 +209,12 @@ def run_benchmark(args: argparse.Namespace) -> Dict[str, Any]:
     # 6. Memory Footprint
     try:
         import psutil
+
         process = psutil.Process(os.getpid())
         ram_mb = process.memory_info().rss / (1024 * 1024)
     except ImportError:
         ram_mb = 142.5  # Fallback estimate
     vram_mb = torch.cuda.max_memory_allocated() / (1024 * 1024) if torch.cuda.is_available() else 0.0
-
 
     # 7. Compile Report
     report = {

@@ -8,7 +8,6 @@ Tests models under adversarial, realistic ISL conditions:
 5. Multi-Model Evaluation: Tier-1 (Temporal 1D-CNN) vs Tier-2 (SignFormer ST-GCN).
 """
 
-import argparse
 import json
 import logging
 import os
@@ -27,17 +26,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.dataset import CLASSROOM_VOCABULARY_200, SignerDisjointSplitter
-from src.data.preprocessing import (
+from src.data.dataset import SignerDisjointSplitter  # noqa: E402
+from src.data.preprocessing import (  # noqa: E402
     extract_2d_pose_vector,
     interpolate_missing_landmarks,
     normalize_landmarks,
     pad_sequence,
 )
-from src.models.classifier import Tier1TemporalCNN
-from src.models.config import Tier1ModelConfig, Tier2SignFormerConfig
-from src.models.signformer_gcn import SignFormerGCN, build_76_keypoint_adjacency
-from src.training.evaluate import compute_confusion_matrix, per_class_metrics
+from src.models.classifier import Tier1TemporalCNN  # noqa: E402
+from src.models.config import Tier1ModelConfig, Tier2SignFormerConfig  # noqa: E402
+from src.models.signformer_gcn import SignFormerGCN  # noqa: E402
+from src.training.evaluate import per_class_metrics  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ISL_Hard_Benchmark")
@@ -80,7 +79,7 @@ def generate_hard_isl_data(
 
     logger.info(
         f"Generating Tough ISL Benchmark: {num_classes} classes, {num_signers} signers, "
-        f"{samples_per_class_signer} samples/class/signer (Occlusion rate: {occlusion_rate*100:.0f}%)..."
+        f"{samples_per_class_signer} samples/class/signer (Occlusion rate: {occlusion_rate * 100:.0f}%)..."
     )
 
     # 1. Base Kinematic Patterns for ISL classes
@@ -369,7 +368,7 @@ def run_rigorous_isl_benchmark():
                 corr += (preds == by).sum().item()
                 tot += len(by)
         acc_occ = float(corr / tot) if tot > 0 else 0.0
-        occlusion_tests[f"occlusion_{int(drop_rate*100)}pct"] = acc_occ
+        occlusion_tests[f"occlusion_{int(drop_rate * 100)}pct"] = acc_occ
 
     # -------------------------------------------------------------
     # Consolidated Results Summary
@@ -400,16 +399,24 @@ def run_rigorous_isl_benchmark():
     print("=" * 80)
     print(f"{'METRIC':<32} | {'TIER-1 (1D-CNN)':<20} | {'TIER-2 (SignFormer GCN)':<20}")
     print("-" * 80)
-    print(f"{'Top-1 Test Accuracy (Unseen Signer)':<32} | {t1_results['accuracy']*100:>18.2f}% | {t2_results['accuracy']*100:>18.2f}%")
-    print(f"{'Top-5 Test Accuracy':<32} | {t1_results['top5_accuracy']*100:>18.2f}% | {t2_results['top5_accuracy']*100:>18.2f}%")
+    print(
+        f"{'Top-1 Test Accuracy (Unseen Signer)':<32} | {t1_results['accuracy'] * 100:>18.2f}% | {t2_results['accuracy'] * 100:>18.2f}%"
+    )
+    print(
+        f"{'Top-5 Test Accuracy':<32} | {t1_results['top5_accuracy'] * 100:>18.2f}% | {t2_results['top5_accuracy'] * 100:>18.2f}%"
+    )
     print(f"{'Macro-F1 Score':<32} | {t1_results['macro_f1']:>19.4f} | {t2_results['macro_f1']:>19.4f}")
-    print(f"{'Forward Pass Latency (ms)':<32} | {t1_results['avg_inference_latency_ms']:>17.2f} ms | {t2_results['avg_inference_latency_ms']:>17.2f} ms")
+    print(
+        f"{'Forward Pass Latency (ms)':<32} | {t1_results['avg_inference_latency_ms']:>17.2f} ms | {t2_results['avg_inference_latency_ms']:>17.2f} ms"
+    )
     print(f"{'Trainable Parameters':<32} | {t1_results['parameters']:>19,d} | {t2_results['parameters']:>19,d}")
-    print(f"{'Training Duration (15 Epochs)':<32} | {t1_results['training_time_s']:>17.2f} s | {t2_results['training_time_s']:>17.2f} s")
+    print(
+        f"{'Training Duration (15 Epochs)':<32} | {t1_results['training_time_s']:>17.2f} s | {t2_results['training_time_s']:>17.2f} s"
+    )
     print("-" * 80)
     print("Occlusion Stress Degradation (Tier-1):")
     for k, v in occlusion_tests.items():
-        print(f"   * {k:<20}: {v*100:.2f}% Accuracy")
+        print(f"   * {k:<20}: {v * 100:.2f}% Accuracy")
     print("=" * 80)
     print("Metrics written to metrics/hard_isl_benchmark.json\n")
 
