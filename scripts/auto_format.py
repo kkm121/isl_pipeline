@@ -4,11 +4,12 @@
 Used as a PostToolUse hook for edit/write tools.
 Validates and canonicalizes the target path, rejecting path traversals and symlink escapes.
 """
+
 import json
 import logging
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()

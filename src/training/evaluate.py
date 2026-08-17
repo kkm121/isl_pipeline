@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -86,17 +87,19 @@ def per_class_metrics(
 
 
 def evaluate(
-    model: ISLClassifier,
+    model: Union[ISLClassifier, torch.nn.Module],
     loader: DataLoader,
     device: str = "auto",
-    class_names: list[str] | None = None,
-) -> dict:
+    class_names: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     dev = resolve_device(device)
     model.eval()
     all_preds = []
     all_targets = []
     criterion = torch.nn.CrossEntropyLoss()
     total_loss = 0.0
+
+    num_classes = getattr(getattr(model, "config", None), "num_classes", 26)
 
     with torch.no_grad():
         for x, y in loader:
@@ -113,7 +116,7 @@ def evaluate(
     y_pred = np.array(all_preds)
 
     accuracy = (y_true == y_pred).mean() if len(y_true) > 0 else 0.0
-    cm = compute_confusion_matrix(y_pred, y_true, model.config.num_classes)
+    cm = compute_confusion_matrix(y_pred, y_true, num_classes)
     class_metrics = per_class_metrics(cm, class_names=class_names)
 
     return {
