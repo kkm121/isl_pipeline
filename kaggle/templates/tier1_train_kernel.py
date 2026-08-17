@@ -4,7 +4,6 @@ import torch.optim as optim
 import numpy as np
 import json
 import os
-from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data import Dataset, DataLoader
 
 # 1. Define Tier1TemporalCNN
@@ -48,8 +47,23 @@ class SyntheticISLDataset(Dataset):
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx], self.signers[idx]
 
+def resolve_safe_device() -> torch.device:
+    if torch.cuda.is_available():
+        try:
+            cap = torch.cuda.get_device_capability()
+            if cap[0] >= 7:
+                return torch.device("cuda")
+            else:
+                print(f"CUDA device compute capability {cap} is sm_{cap[0]}{cap[1]} (< sm_70). Falling back to multi-core CPU.")
+                return torch.device("cpu")
+        except Exception as e:
+            print(f"CUDA check failed: {e}. Falling back to CPU.")
+            return torch.device("cpu")
+    return torch.device("cpu")
+
+
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_safe_device()
     print(f"Using device: {device}")
     
     # Initialize dataset
@@ -76,7 +90,8 @@ def main():
     model = Tier1TemporalCNN(num_classes=200).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scaler = GradScaler()
+    use_amp = (device.type == "cuda")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     
     epochs = 15
     best_val_acc = 0.0
@@ -92,13 +107,17 @@ def main():
             batch_data, batch_labels = batch_data.to(device), batch_labels.to(device)
             
             optimizer.zero_grad()
-            with autocast():
+            with torch.amp.autocast(device_type=device.type, enabled=use_amp):
                 outputs = model(batch_data)
                 loss = criterion(outputs, batch_labels)
-                
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            
+            if use_amp:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             
             total_loss += loss.item()
             
