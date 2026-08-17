@@ -197,13 +197,26 @@ def run_benchmark(args: argparse.Namespace) -> Dict[str, Any]:
 
     # Regional Synthesis (IndicTrans2 + TTS) benchmark
     synth_engine = RegionalSynthesisEngine()
-    synth_start = time.perf_counter()
-    synth_res = synth_engine.process_multilingual_pipeline("TEACHER")
-    latencies["regional_synthesis_ms"] = float((time.perf_counter() - synth_start) * 1000.0)
+    synth_res = synth_engine.process_multilingual_pipeline("TEACHER", target_languages=["hin_Deva"])
+    latencies["regional_translation_ms"] = float(synth_res["languages"]["hin_Deva"]["translation_latency_ms"])
+    latencies["tts_synthesis_ms"] = float(synth_res["languages"]["hin_Deva"]["tts"]["latency_ms"])
+    latencies["regional_synthesis_total_ms"] = float(synth_res["total_synthesis_latency_ms"])
 
-    total_pipeline_latency_ms = (
-        latencies["landmark_extraction_ms"] + latencies["model_forward_ms"] + latencies["streaming_buffer_step_ms"]
-    )
+    # End-to-end simulation for percentiles
+    e2e_times = []
+    for _ in range(50):
+        t0 = time.perf_counter()
+        _ = extractor.extract_from_frame(dummy_frame)
+        _ = model(dummy_input)
+        predictor.process_frame_landmarks(dummy_kp)
+        _ = synth_engine.process_multilingual_pipeline("TEACHER", target_languages=["hin_Deva"])
+        e2e_times.append((time.perf_counter() - t0) * 1000.0)
+
+    latencies["end_to_end_p50_ms"] = float(np.percentile(e2e_times, 50))
+    latencies["end_to_end_p95_ms"] = float(np.percentile(e2e_times, 95))
+    latencies["end_to_end_p99_ms"] = float(np.percentile(e2e_times, 99))
+
+    total_pipeline_latency_ms = float(np.median(e2e_times))
     latencies["total_glass_to_glass_ms"] = total_pipeline_latency_ms
 
     # 6. Memory Footprint
@@ -278,7 +291,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--device", type=str, default="cpu", help="Device (cpu/cuda)")
-    parser.add_argument("--output-json", type=str, default="results/tier1_benchmark.json", help="Output JSON path")
+    parser.add_argument("--output-json", type=str, default="metrics/tier1_synthetic_benchmark.json", help="Output JSON path")
 
     args = parser.parse_args()
     run_benchmark(args)

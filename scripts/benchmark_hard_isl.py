@@ -1,4 +1,4 @@
-"""Rigorous Stress-Testing Benchmark Suite for Indian Sign Language (ISL).
+"""Synthetic Stress & Robustness Benchmark.
 
 Tests models under adversarial, realistic ISL conditions:
 1. Strict Signer-Disjoint Generalization (zero train/test signer overlap).
@@ -374,7 +374,7 @@ def run_rigorous_isl_benchmark():
     # Consolidated Results Summary
     # -------------------------------------------------------------
     results = {
-        "benchmark_name": "ISL_Adversarial_Stress_Benchmark_v1",
+        "benchmark_name": "Synthetic_Stress_Robustness_Benchmark",
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
         "hardware_device": device,
         "dataset_profile": {
@@ -391,7 +391,7 @@ def run_rigorous_isl_benchmark():
     }
 
     os.makedirs("metrics", exist_ok=True)
-    with open("metrics/hard_isl_benchmark.json", "w") as f:
+    with open("metrics/tier2_translation_benchmark.json", "w") as f:
         json.dump(results, f, indent=2)
 
     print("\n" + "=" * 80)

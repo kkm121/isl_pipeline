@@ -1,7 +1,7 @@
 import logging
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import torch
 from torch import nn
@@ -9,6 +9,21 @@ from torch import nn
 from src.models.config import Tier2SignFormerConfig
 
 logger = logging.getLogger(__name__)
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model: int, max_len: int = 5000):
+        super().__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe.unsqueeze(0))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pe_tensor: torch.Tensor = cast(torch.Tensor, getattr(self, "pe"))
+        return x + pe_tensor[:, : x.size(1), :]
 
 
 def build_76_keypoint_adjacency() -> torch.Tensor:
@@ -23,7 +38,7 @@ def build_76_keypoint_adjacency() -> torch.Tensor:
     adj = torch.eye(num_nodes)
 
     # Hand connections (wrist to MCPs, fingers)
-    def connect_hand(offset):
+    def connect_hand(offset: int) -> None:
         # Wrist to finger roots
         for root in [1, 5, 9, 13, 17]:
             adj[offset, offset + root] = 1.0
@@ -61,7 +76,6 @@ def build_76_keypoint_adjacency() -> torch.Tensor:
             adj[u, v] = 1.0
             adj[v, u] = 1.0
 
-    # Face connections (53..75) - connect adjacent NMM points and anchor to head/nose (42)
     # Face connections (53..75) - Anatomically correct sub-graphs
     # Left Eyebrow (53-57)
     for i in range(53, 57):
@@ -100,7 +114,7 @@ def build_76_keypoint_adjacency() -> torch.Tensor:
     deg_inv_sqrt[torch.isinf(deg_inv_sqrt)] = 0.0
     norm_adj = deg_inv_sqrt.unsqueeze(1) * adj * deg_inv_sqrt.unsqueeze(0)
 
-    return norm_adj
+    return cast(torch.Tensor, norm_adj)
 
 
 class SpatialGraphConv(nn.Module):
@@ -119,13 +133,14 @@ class SpatialGraphConv(nn.Module):
         b, t, v, c = x.shape
         x_flat = self.fc(x)  # (b, t, v, out_c)
 
+        adj_buf: torch.Tensor = cast(torch.Tensor, getattr(self, "adj"))
         # Graph aggregation: (v, v) @ (b, t, v, out_c) -> (b, t, v, out_c)
-        out = torch.einsum("vw,btwc->btvc", self.adj, x_flat)
+        out = torch.einsum("vw,btwc->btvc", adj_buf, x_flat)
         out = out.reshape(b * t, v * out.shape[-1])
         out = self.bn(out)
         out = self.relu(out)
         out = out.reshape(b, t, v, -1)
-        return out
+        return cast(torch.Tensor, out)
 
 
 class TemporalGraphConv(nn.Module):
@@ -150,7 +165,7 @@ class TemporalGraphConv(nn.Module):
         out = self.relu(self.bn(self.conv(x)))
         # permute back to (batch, seq_len, num_nodes, out_channels)
         out = out.permute(0, 2, 3, 1)
-        return out
+        return cast(torch.Tensor, out)
 
 
 class STGCNBlock(nn.Module):
@@ -172,7 +187,7 @@ class STGCNBlock(nn.Module):
         res = self.shortcut(x)
         out = self.sgcn(x)
         out = self.tgcn(out)
-        return out + res
+        return cast(torch.Tensor, out + res)
 
 
 class EuclideanSelfAttention(nn.Module):
@@ -217,7 +232,7 @@ class EuclideanSelfAttention(nn.Module):
 
         context = torch.matmul(attn_weights, v)  # (b, h, t, head_dim)
         context = context.transpose(1, 2).contiguous().view(b, t, d)
-        return self.out_proj(context)
+        return cast(torch.Tensor, self.out_proj(context))
 
 
 class SignFormerGCN(nn.Module):
@@ -233,7 +248,9 @@ class SignFormerGCN(nn.Module):
 
         # ST-GCN Front-End
         self.stgcn1 = STGCNBlock(self.config.in_channels, self.config.graph_hidden_dim // 2, self.config.num_nodes)
-        self.stgcn2 = STGCNBlock(self.config.graph_hidden_dim // 2, self.config.graph_hidden_dim, self.config.num_nodes)
+        self.stgcn2 = STGCNBlock(
+            self.config.graph_hidden_dim // 2, self.config.graph_hidden_dim, self.config.num_nodes
+        )
 
         # Spatial pooling across 76 skeleton nodes -> graph feature vector
         self.proj_to_transformer = nn.Linear(self.config.graph_hidden_dim, self.config.transformer_d_model)
@@ -252,6 +269,19 @@ class SignFormerGCN(nn.Module):
             nn.Linear(self.config.dim_feedforward, self.config.transformer_d_model),
         )
         self.encoder_norm2 = nn.LayerNorm(self.config.transformer_d_model)
+
+        # Autoregressive Decoder additions
+        self.tgt_embedding = nn.Embedding(self.config.vocab_size, self.config.transformer_d_model)
+        self.pos_encoder = PositionalEncoding(self.config.transformer_d_model, max_len=self.config.max_target_len)
+
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=self.config.transformer_d_model,
+            nhead=self.config.nhead,
+            dim_feedforward=self.config.dim_feedforward,
+            dropout=self.config.dropout,
+            batch_first=True,
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_layers=self.config.num_decoder_layers)
 
         # Sequence translation head (gloss-free text generation logits)
         self.translation_head = nn.Linear(self.config.transformer_d_model, self.config.vocab_size)
@@ -274,18 +304,64 @@ class SignFormerGCN(nn.Module):
         feat = self.encoder_norm1(feat + attn_out)
         ffn_out = self.encoder_ffn(feat)
         memory = self.encoder_norm2(feat + ffn_out)
-        return memory
+        return cast(torch.Tensor, memory)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Returns token logits for continuous sentence generation: (batch, seq_len, vocab_size)
-        memory = self.encode(x)
-        logits = self.translation_head(memory)
-        return logits
+    def forward(self, src: torch.Tensor, tgt: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Forward pass for training with teacher forcing.
+
+        src: (batch, seq_len, num_nodes, in_channels) or flat
+        tgt: (batch, tgt_len) target token IDs. If None, acts as a sequence classifier.
+        """
+        memory = self.encode(src)
+
+        if tgt is None:
+            return cast(torch.Tensor, self.translation_head(memory))
+
+        tgt_emb = self.tgt_embedding(tgt)
+        tgt_emb = self.pos_encoder(tgt_emb)
+
+        tgt_len = tgt.size(1)
+        tgt_mask = nn.Transformer.generate_square_subsequent_mask(tgt_len).to(tgt.device)
+
+        out = self.decoder(tgt=tgt_emb, memory=memory, tgt_mask=tgt_mask)
+
+        logits = self.translation_head(out)
+        return cast(torch.Tensor, logits)
+
+    def generate(self, src: torch.Tensor, max_len: int, start_token_id: int, end_token_id: int) -> torch.Tensor:
+        """Autoregressive greedy decoding.
+
+        src: (batch, seq_len, num_nodes, in_channels) or flat
+        """
+        device = src.device
+        batch_size = src.size(0)
+
+        memory = self.encode(src)
+
+        tgt = torch.full((batch_size, 1), start_token_id, dtype=torch.long, device=device)
+
+        for _ in range(max_len):
+            tgt_emb = self.tgt_embedding(tgt)
+            tgt_emb = self.pos_encoder(tgt_emb)
+
+            tgt_mask = nn.Transformer.generate_square_subsequent_mask(tgt.size(1)).to(device)
+
+            out = self.decoder(tgt=tgt_emb, memory=memory, tgt_mask=tgt_mask)
+
+            logits = self.translation_head(out[:, -1, :])
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+
+            tgt = torch.cat([tgt, next_token], dim=1)
+
+            if (tgt == end_token_id).any(dim=1).all():
+                break
+
+        return tgt
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
-    def save(self, path: str):
+    def save(self, path: str) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {

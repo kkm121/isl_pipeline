@@ -300,6 +300,55 @@ class ISLDataModule:
         self.labels = np.array(lbls)
         self.signer_ids = signers
 
+    def load_include_dataset(self, data_dir: str) -> None:
+        """Structured directory loader for real ISL datasets (e.g. INCLUDE).
+
+        Supports .npy, .csv, and .json landmark files.
+        Extracts signer metadata from filenames (e.g., 'signer23_hello.npy' -> 'signer23').
+        """
+        seqs = []
+        lbls = []
+        signers: List[str] = []
+
+        path = Path(data_dir)
+        class_dirs = sorted([d for d in path.iterdir() if d.is_dir()])
+
+        import pandas as pd
+
+        for i, class_dir in enumerate(class_dirs):
+            for file_path in class_dir.iterdir():
+                if file_path.suffix not in [".npy", ".csv", ".json"]:
+                    continue
+
+                if file_path.suffix == ".npy":
+                    seq = np.load(file_path)
+                elif file_path.suffix == ".csv":
+                    seq = pd.read_csv(file_path).values
+                    kps = self.config.num_landmarks
+                    dim = getattr(self.config, "landmark_dim", 3)
+                    if seq.size > 0:
+                        seq = seq.reshape(-1, kps, dim)
+                elif file_path.suffix == ".json":
+                    with open(file_path, "r") as f:
+                        data = json.load(f)
+                    seq = np.array(data.get("landmarks", data))
+
+                seqs.append(seq)
+                lbls.append(i)
+
+                parts = file_path.stem.split("_")
+                signer = parts[0] if len(parts) > 1 else "signer_unknown"
+                signers.append(signer)
+
+        max_t = max((len(s) for s in seqs), default=self.config.sequence_length)
+        kps = self.config.num_landmarks
+        dim = getattr(self.config, "landmark_dim", 3)
+        padded_seqs = [pad_sequence(s, max_t) for s in seqs]
+        self.sequences = np.array(padded_seqs) if padded_seqs else np.zeros((0, max_t, kps, dim))
+        self.labels = np.array(lbls)
+        self.signer_ids = signers
+        logger.info(f"Loaded {len(self.sequences)} samples from {len(class_dirs)} classes.")
+
     def load_from_json(self, json_path: str) -> None:
         with open(json_path, "r") as f:
             manifest = json.load(f)

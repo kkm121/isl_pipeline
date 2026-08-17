@@ -1,0 +1,16 @@
+{
+  "id": "kkm121121/real-isl-training-run",
+  "title": "Real ISL Dataset Training Run",
+  "code_file": "real_isl_train_kernel.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_internet": "true",
+  "dataset_sources": [
+    "kkm121121/real-isl-dataset"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

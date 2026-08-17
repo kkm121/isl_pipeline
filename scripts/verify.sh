@@ -118,8 +118,10 @@ if [ ! -f "$BASELINE_FILE" ]; then
 else
   BASE_SHA=$(cat "$BASELINE_FILE" | tr -d '[:space:]')
   echo "  Comparing working tree against mandatory turn baseline: $BASE_SHA"
-  DIFF_COUNT=$(git diff --name-only "$BASE_SHA" 2>/dev/null | wc -l || echo "0")
-  STATUS_COUNT=$(git status --porcelain | wc -l)
+  DIFF_COUNT=$(git diff --name-only "$BASE_SHA" 2>/dev/null | wc -l | tr -d '[:space:]')
+  DIFF_COUNT=${DIFF_COUNT:-0}
+  STATUS_COUNT=$(git status --porcelain | wc -l | tr -d '[:space:]')
+  STATUS_COUNT=${STATUS_COUNT:-0}
   TOTAL_CHANGES=$((DIFF_COUNT + STATUS_COUNT))
   echo "  Files changed since turn baseline: $DIFF_COUNT (dirty working tree: $STATUS_COUNT)"
   if [ "$TOTAL_CHANGES" -eq 0 ]; then

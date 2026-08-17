@@ -177,13 +177,13 @@ def run_webcam_stream(
     checkpoint_path: str = "kaggle_output/tier1_best.pth",
     device: str = "cpu",
 ):
-    print("\n" + "=" * 70)
-    print("🎥 INITIALIZING INDIAN SIGN LANGUAGE (ISL) LIVE WEBCAM DEMO")
-    print("=" * 70)
-    print(f"Camera ID   : {camera_id}")
-    print(f"Checkpoint  : {checkpoint_path}")
-    print(f"Inference   : {device.upper()}")
-    print("=" * 70 + "\n")
+    print("\n" + "=" * 70, flush=True)
+    print("=== INITIALIZING INDIAN SIGN LANGUAGE (ISL) LIVE WEBCAM DEMO ===", flush=True)
+    print("=" * 70, flush=True)
+    print(f"Camera ID   : {camera_id}", flush=True)
+    print(f"Checkpoint  : {checkpoint_path}", flush=True)
+    print(f"Inference   : {device.upper()}", flush=True)
+    print("=" * 70 + "\n", flush=True)
 
     # 1. Instantiate Model
     num_classes = 200
@@ -192,7 +192,7 @@ def run_webcam_stream(
 
     # Load weights if available
     if os.path.exists(checkpoint_path):
-        print(f"Loading checkpoint weights from {checkpoint_path}...")
+        print(f"Loading checkpoint weights from {checkpoint_path}...", flush=True)
         ckpt = torch.load(checkpoint_path, map_location=device)
         state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
         # Filter matching weights
@@ -200,9 +200,9 @@ def run_webcam_stream(
         pretrained_dict = {k: v for k, v in state_dict.items() if k in model_dict and model_dict[k].shape == v.shape}
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
-        print(f"Loaded {len(pretrained_dict)} matching tensor layers.")
+        print(f"Loaded {len(pretrained_dict)} matching tensor layers.", flush=True)
     else:
-        print("Checkpoint not found; using initialized model weights.")
+        print("Checkpoint not found; using initialized model weights.", flush=True)
 
     model.eval()
 
@@ -224,8 +224,8 @@ def run_webcam_stream(
     # 3. Open Video Stream
     cap = cv2.VideoCapture(camera_id)
     if not cap.isOpened():
-        print(f"❌ Error: Unable to open webcam on index {camera_id}.")
-        print("Tip: If you have an external webcam or virtual camera, try passing --camera 1 or --camera 2.")
+        print(f"Error: Unable to open webcam on index {camera_id}.", flush=True)
+        print("Tip: If you have an external webcam or virtual camera, try passing --camera 1 or --camera 2.", flush=True)
         return
 
     # Set frame resolution
@@ -236,7 +236,7 @@ def run_webcam_stream(
     prev_time = time.perf_counter()
     fps = 30.0
 
-    print("✅ Live camera stream started! Press 'q' in the window to quit.\n")
+    print("Live camera stream started! Press 'q' in the window to quit.\n", flush=True)
 
     try:
         while True:

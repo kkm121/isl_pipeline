@@ -214,9 +214,12 @@ def test_signformer_gcn_forward():
         transformer_d_model=64,
         nhead=4,
         num_encoder_layers=1,
+        num_decoder_layers=1,
         vocab_size=100,
+        max_target_len=32,
     )
     model = SignFormerGCN(cfg)
     x = torch.randn(2, 15, 76, 2)  # (batch, seq_len, 76 nodes, 2 coords)
-    logits = model(x)
-    assert logits.shape == (2, 15, 100)
+    tgt = torch.randint(0, 100, (2, 8))  # (batch, tgt_len)
+    logits = model(x, tgt)
+    assert logits.shape == (2, 8, 100)

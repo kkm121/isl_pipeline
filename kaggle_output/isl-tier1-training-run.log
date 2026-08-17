@@ -1,0 +1,53 @@
+[{"stream_name":"stderr","time":10.901250893,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":10.901332555,"data":"    Found GPU0 Tesla P100-PCIE-16GB which is of cuda capability 6.0.\n"}
+,{"stream_name":"stderr","time":10.901339827,"data":"    Minimum and Maximum cuda capability supported by this version of PyTorch is\n"}
+,{"stream_name":"stderr","time":10.90134424,"data":"    (7.0) - (12.0)\n"}
+,{"stream_name":"stderr","time":10.901347659,"data":"    \n"}
+,{"stream_name":"stderr","time":10.901351026,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":10.901354847,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":10.901358414,"data":"    Please install PyTorch with a following CUDA\n"}
+,{"stream_name":"stderr","time":10.901362634,"data":"    configurations:  12.6 following instructions at\n"}
+,{"stream_name":"stderr","time":10.901366547,"data":"    https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":10.90136989,"data":"    \n"}
+,{"stream_name":"stderr","time":10.901373139,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":10.901480143,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":10.901501558,"data":"Tesla P100-PCIE-16GB with CUDA capability sm_60 is not compatible with the current PyTorch installation.\n"}
+,{"stream_name":"stderr","time":10.901505094000001,"data":"The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 sm_90 sm_100 sm_120.\n"}
+,{"stream_name":"stderr","time":10.90150799,"data":"If you want to use the Tesla P100-PCIE-16GB GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":10.901510856,"data":"\n"}
+,{"stream_name":"stderr","time":10.901513214,"data":"  queued_call()\n"}
+,{"stream_name":"stdout","time":10.903917348,"data":"CUDA device compute capability (6, 0) is sm_60 (\u003c sm_70). Falling back to multi-core CPU.\n"}
+,{"stream_name":"stdout","time":10.903948661,"data":"Using device: cpu\n"}
+,{"stream_name":"stdout","time":11.168197197,"data":"Generated 4000 synthetic samples.\n"}
+,{"stream_name":"stdout","time":17.569734195,"data":"Starting training loop...\n"}
+,{"stream_name":"stdout","time":18.584628383,"data":"Epoch [1/15] - Loss: 5.3551 - Val Acc: 0.0025\n"}
+,{"stream_name":"stdout","time":18.596585761,"data":"-\u003e Saved new best model (Val Acc: 0.0025)\n"}
+,{"stream_name":"stdout","time":19.253069292,"data":"Epoch [2/15] - Loss: 5.2850 - Val Acc: 0.0025\n"}
+,{"stream_name":"stdout","time":19.254612801,"data":"-\u003e Saved new best model (Val Acc: 0.0025)\n"}
+,{"stream_name":"stdout","time":19.87736601,"data":"Epoch [3/15] - Loss: 5.2535 - Val Acc: 0.0050\n"}
+,{"stream_name":"stdout","time":19.879221236,"data":"-\u003e Saved new best model (Val Acc: 0.0050)\n"}
+,{"stream_name":"stdout","time":20.500756993,"data":"Epoch [4/15] - Loss: 5.2169 - Val Acc: 0.0050\n"}
+,{"stream_name":"stdout","time":20.502336517,"data":"-\u003e Saved new best model (Val Acc: 0.0050)\n"}
+,{"stream_name":"stdout","time":21.113028898,"data":"Epoch [5/15] - Loss: 5.1808 - Val Acc: 0.0000\n"}
+,{"stream_name":"stdout","time":21.700240235,"data":"Epoch [6/15] - Loss: 5.1388 - Val Acc: 0.0088\n"}
+,{"stream_name":"stdout","time":21.701760647,"data":"-\u003e Saved new best model (Val Acc: 0.0088)\n"}
+,{"stream_name":"stdout","time":22.412975415,"data":"Epoch [7/15] - Loss: 5.0874 - Val Acc: 0.0063\n"}
+,{"stream_name":"stdout","time":23.070837723,"data":"Epoch [8/15] - Loss: 5.0276 - Val Acc: 0.0050\n"}
+,{"stream_name":"stdout","time":23.714064458,"data":"Epoch [9/15] - Loss: 4.9578 - Val Acc: 0.0013\n"}
+,{"stream_name":"stdout","time":24.389102447,"data":"Epoch [10/15] - Loss: 4.8705 - Val Acc: 0.0037\n"}
+,{"stream_name":"stdout","time":25.057653574,"data":"Epoch [11/15] - Loss: 4.7769 - Val Acc: 0.0050\n"}
+,{"stream_name":"stdout","time":25.757981223,"data":"Epoch [12/15] - Loss: 4.6603 - Val Acc: 0.0037\n"}
+,{"stream_name":"stdout","time":26.456094175,"data":"Epoch [13/15] - Loss: 4.5327 - Val Acc: 0.0037\n"}
+,{"stream_name":"stdout","time":27.114011741,"data":"Epoch [14/15] - Loss: 4.3933 - Val Acc: 0.0088\n"}
+,{"stream_name":"stdout","time":27.115794176,"data":"-\u003e Saved new best model (Val Acc: 0.0088)\n"}
+,{"stream_name":"stdout","time":27.827064941,"data":"Epoch [15/15] - Loss: 4.2402 - Val Acc: 0.0050\n"}
+,{"stream_name":"stdout","time":27.827118705,"data":"Evaluating on test set (unseen signer)...\n"}
+,{"stream_name":"stdout","time":27.8622267,"data":"Test Accuracy: 0.0025\n"}
+,{"stream_name":"stdout","time":27.862637431,"data":"Saved metrics_summary.json\n"}
+,{"stream_name":"stderr","time":34.32411239,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":34.324140596,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":34.734105403,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":34.734130988,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":35.459865665,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":37.053750169,"data":"[NbConvertApp] Writing 305919 bytes to __results__.html\n"}
+]
