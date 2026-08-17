@@ -11,15 +11,13 @@ import json
 import logging
 import os
 import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 # Add project root to sys.path
@@ -40,7 +38,7 @@ app = FastAPI(title="ISL Pipeline Live Web UI", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost", "http://127.0.0.1", "http://localhost:8000", "http://127.0.0.1:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,12 +73,6 @@ pipe_cfg.buffer.window_size = 45
 pipe_cfg.buffer.step_size = 5
 pipe_cfg.buffer.consensus_frames = 3
 
-predictor = StreamingSignPredictor(
-    model=model,
-    config=pipe_cfg,
-    class_names=CLASSROOM_VOCABULARY_200,
-    device=DEVICE,
-)
 
 synthesis_engine = RegionalSynthesisEngine()
 
@@ -189,6 +181,14 @@ async def get_agents_status():
 async def websocket_stream_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("Client connected to ISL WebSocket stream.")
+
+    session_predictor = StreamingSignPredictor(
+        model=model,
+        config=pipe_cfg,
+        class_names=CLASSROOM_VOCABULARY_200,
+        device=DEVICE,
+    )
+
     try:
         while True:
             data = await websocket.receive_text()
@@ -197,13 +197,17 @@ async def websocket_stream_endpoint(websocket: WebSocket):
             landmarks_raw = payload.get("landmarks")
             target_lang = payload.get("target_lang", "hin_Deva")
 
+            landmarks = None
             if landmarks_raw is not None:
-                landmarks = np.array(landmarks_raw, dtype=np.float32)
-            else:
-                landmarks = None
+                try:
+                    arr = np.array(landmarks_raw, dtype=np.float32)
+                    if arr.shape in [(76, 3), (21, 3)] and np.isfinite(arr).all():
+                        landmarks = arr
+                except (ValueError, TypeError):
+                    pass
 
             # Process frame through temporal rolling buffer
-            packet = predictor.process_frame_landmarks(landmarks)
+            packet = session_predictor.process_frame_landmarks(landmarks)
 
             # Multilingual Regional Translation
             pred = packet.get("prediction")
@@ -227,6 +231,8 @@ async def websocket_stream_endpoint(websocket: WebSocket):
             await websocket.close()
         except Exception:
             pass
+    finally:
+        session_predictor.reset_buffer()
 
 
 if __name__ == "__main__":
