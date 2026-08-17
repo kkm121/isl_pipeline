@@ -55,7 +55,9 @@ class ISLClassifier(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (batch, seq_len, input_size)
+        # x: (batch, seq_len, input_size) or (batch, seq_len, num_nodes, coords)
+        if x.dim() == 4:
+            x = x.reshape(x.shape[0], x.shape[1], -1)
         x = self.input_proj(x)
         out, _ = self.lstm(x)
 
@@ -65,6 +67,7 @@ class ISLClassifier(nn.Module):
             out = out[:, -1, :]
 
         return self.classifier(out)
+
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
@@ -161,7 +164,9 @@ class Tier1TemporalCNN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (batch, seq_len, input_size) -> permute to (batch, input_size, seq_len)
+        # x: (batch, seq_len, input_size) or (batch, seq_len, num_nodes, coords)
+        if x.dim() == 4:
+            x = x.reshape(x.shape[0], x.shape[1], -1)
         x = x.permute(0, 2, 1)
         feat = self.stem(x)
         feat = self.backbone(feat)  # (batch, C, seq_len)
@@ -176,6 +181,7 @@ class Tier1TemporalCNN(nn.Module):
             pooled = feat.mean(dim=2)
 
         return self.classifier(pooled)
+
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

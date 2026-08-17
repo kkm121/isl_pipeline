@@ -340,15 +340,26 @@ class ISLDataModule:
             val_idx = indices[train_end:val_end].tolist()
             test_idx = indices[val_end:].tolist()
 
-        train_ds = ISLDataset(self.sequences[train_idx], self.labels[train_idx], self.config, augment=True)
-        val_ds = ISLDataset(self.sequences[val_idx], self.labels[val_idx], self.config, augment=False)
-        test_ds = ISLDataset(self.sequences[test_idx], self.labels[test_idx], self.config, augment=False)
+        train_signers = [self.signer_ids[i] for i in train_idx] if self.signer_ids else None
+        val_signers = [self.signer_ids[i] for i in val_idx] if self.signer_ids else None
+        test_signers = [self.signer_ids[i] for i in test_idx] if self.signer_ids else None
+
+        train_ds = ISLDataset(
+            self.sequences[train_idx], self.labels[train_idx], self.config, augment=True, signer_ids=train_signers
+        )
+        val_ds = ISLDataset(
+            self.sequences[val_idx], self.labels[val_idx], self.config, augment=False, signer_ids=val_signers
+        )
+        test_ds = ISLDataset(
+            self.sequences[test_idx], self.labels[test_idx], self.config, augment=False, signer_ids=test_signers
+        )
 
         self.train_dataset = train_ds
         self.val_dataset = val_ds
         self.test_dataset = test_ds
 
         return train_ds, val_ds, test_ds
+
 
     def get_dataloaders(self, batch_size: int = 32, num_workers: int = 0) -> Tuple[DataLoader, DataLoader, DataLoader]:
         train_ds, val_ds, test_ds = self.split()

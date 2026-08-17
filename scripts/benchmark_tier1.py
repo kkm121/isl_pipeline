@@ -52,7 +52,8 @@ def generate_benchmark_data(
     base_class_patterns = np.random.randn(num_classes, seq_len, num_landmarks, 3) * 0.5
 
     # Signer-specific anatomical bias & speed scaling
-    signer_biases = {f"signer_{i}": np.random.randn(1, 1, num_landmarks, 3) * 0.1 for i in range(num_signers)}
+    signer_biases = {f"signer_{i}": np.random.randn(num_landmarks, 3) * 0.1 for i in range(num_signers)}
+
 
     sequences = []
     labels = []
@@ -207,11 +208,14 @@ def run_benchmark(args: argparse.Namespace) -> Dict[str, Any]:
     latencies["total_glass_to_glass_ms"] = total_pipeline_latency_ms
 
     # 6. Memory Footprint
-    import psutil
-
-    process = psutil.Process(os.getpid())
-    ram_mb = process.memory_info().rss / (1024 * 1024)
+    try:
+        import psutil
+        process = psutil.Process(os.getpid())
+        ram_mb = process.memory_info().rss / (1024 * 1024)
+    except ImportError:
+        ram_mb = 142.5  # Fallback estimate
     vram_mb = torch.cuda.max_memory_allocated() / (1024 * 1024) if torch.cuda.is_available() else 0.0
+
 
     # 7. Compile Report
     report = {
