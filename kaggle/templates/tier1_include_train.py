@@ -64,6 +64,23 @@ try:
 except Exception as e:
     print(f"kagglehub notice: {e}")
 
+label_map_file = None
+for s_root in search_roots:
+    if os.path.exists(s_root):
+        for root, _, files in os.walk(s_root):
+            if "label_map.json" in files:
+                label_map_file = os.path.join(root, "label_map.json")
+                break
+        if label_map_file: break
+
+class_to_idx = {}
+if label_map_file:
+    print(f"✅ Found label_map.json at: {label_map_file}")
+    with open(label_map_file, "r") as f:
+        class_to_idx = json.load(f)
+else:
+    print("⚠️ WARNING: label_map.json not found! Classes will be inferred from paths.")
+
 all_parquet_files = []
 all_csv_files = []
 
@@ -116,21 +133,30 @@ if all_csv_files:
 
 if not samples_registry and all_parquet_files:
     # Universal Folder-based Classification: <class_folder>/<file>.parquet
-    print("Indexing Parquet files by class folder structure...")
+    print("Indexing Parquet files by parsing paths for true class labels...")
     for idx, p_file in enumerate(all_parquet_files):
-        parent_dir = os.path.basename(os.path.dirname(p_file))
-        # If parent dir is generic ('train_landmarks', 'versions'), use filename prefix
-        if parent_dir.lower() in ["train_landmarks", "1", "versions", "input", "landmarks"]:
-            c_name = os.path.basename(p_file).split("_")[0]
-        else:
-            c_name = parent_dir
+        c_name = None
+        norm_p = p_file.replace("\\", "/")
+        fname = os.path.basename(p_file)
+        
+        for cls_name in class_to_idx.keys():
+            if f"/{cls_name}/" in norm_p or fname.startswith(f"{cls_name}_") or fname == f"{cls_name}.parquet":
+                c_name = cls_name
+                break
+                
+        if c_name is None:
+            # Fallback
+            parent_dir = os.path.basename(os.path.dirname(p_file))
+            if parent_dir.lower() in ["train_landmarks", "1", "versions", "input", "landmarks"]:
+                c_name = os.path.basename(p_file).split("_")[0]
+            else:
+                c_name = parent_dir
         
         # Estimate signer ID from filename if present (e.g. signer3_hello_01.parquet -> 3)
         signer_id = 0
-        fname = os.path.basename(p_file).lower()
-        if "signer" in fname:
+        if "signer" in fname.lower():
             try:
-                part = fname.split("signer")[1]
+                part = fname.lower().split("signer")[1]
                 digits = "".join([ch for ch in part[:3] if ch.isdigit()])
                 if digits:
                     signer_id = int(digits)
@@ -148,9 +174,10 @@ if not samples_registry:
     )
 
 # Build Vocabulary & Signer Disjoint Splits
-unique_classes = sorted(list(set(s[1] for s in samples_registry)))
-num_classes = len(unique_classes)
-class_to_idx = {c: i for i, c in enumerate(unique_classes)}
+if not class_to_idx:
+    unique_classes = sorted(list(set(s[1] for s in samples_registry)))
+    class_to_idx = {c: i for i, c in enumerate(unique_classes)}
+num_classes = len(class_to_idx)
 
 unique_signers = sorted(list(set(s[2] for s in samples_registry)))
 n_s = len(unique_signers)
@@ -196,10 +223,30 @@ class ISLSequenceParquetDataset(Dataset):
         lbl = self.class_to_idx.get(c_name, 0)
 
         df = pd.read_parquet(p_path)
+        
+        # 152 dimensions (76 keypoints * 2)
+        face_idxs = [0, 13, 14, 17, 37, 39, 40, 61, 78, 80, 81, 82, 84, 87, 88, 91, 95, 146, 178, 181, 185, 191, 267]
+        pose_idxs = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        lh_idxs = list(range(21))
+        rh_idxs = list(range(21))
+        
+        req_types = (['face'] * 23) + (['pose'] * 11) + (['left_hand'] * 21) + (['right_hand'] * 21)
+        req_idxs = face_idxs + pose_idxs + lh_idxs + rh_idxs
+
         if "x" in df.columns and "y" in df.columns and "type" in df.columns:
             try:
-                pivoted = df.pivot(index="frame", columns=["type", "landmark_index"], values=["x", "y"]).fillna(0.0)
-                seq = pivoted.values.astype(np.float32)
+                pivoted = df.pivot(index="frame", columns=["type", "landmark_index"], values=["x", "y"])
+                frames = len(pivoted)
+                seq_x = np.zeros((frames, 76), dtype=np.float32)
+                seq_y = np.zeros((frames, 76), dtype=np.float32)
+                
+                for i, (t, l_idx) in enumerate(zip(req_types, req_idxs)):
+                    if ('x', t, l_idx) in pivoted.columns:
+                        seq_x[:, i] = pivoted[('x', t, l_idx)].values
+                    if ('y', t, l_idx) in pivoted.columns:
+                        seq_y[:, i] = pivoted[('y', t, l_idx)].values
+                
+                seq = np.hstack([seq_x, seq_y])
             except Exception:
                 x_v = df["x"].fillna(0.0).values.reshape(-1, 1)
                 y_v = df["y"].fillna(0.0).values.reshape(-1, 1)
@@ -216,6 +263,26 @@ class ISLSequenceParquetDataset(Dataset):
             seq = np.hstack([seq, np.zeros((T, target_F - F), dtype=np.float32)])
         elif F > target_F:
             seq = seq[:, :target_F]
+            
+        # Normalize landmarks relative to mid-shoulder distance
+        # Indices in our 76-keypoint list:
+        # face (0-22), pose (23-33), left (34-54), right (55-75)
+        # Shoulders: pose 11 -> index 23, pose 12 -> index 24
+        l_shoulder_idx = 23
+        r_shoulder_idx = 24
+        
+        x_l, y_l = seq[:, l_shoulder_idx], seq[:, 76 + l_shoulder_idx]
+        x_r, y_r = seq[:, r_shoulder_idx], seq[:, 76 + r_shoulder_idx]
+        
+        mid_x = (x_l + x_r) / 2.0
+        mid_y = (y_l + y_r) / 2.0
+        
+        dist = np.sqrt((x_l - x_r)**2 + (y_l - y_r)**2)
+        dist = np.where(dist < 1e-5, 1.0, dist)
+        
+        for i in range(76):
+            seq[:, i] = (seq[:, i] - mid_x) / dist
+            seq[:, 76 + i] = (seq[:, 76 + i] - mid_y) / dist
 
         if T > self.max_len:
             start = (T - self.max_len) // 2
@@ -229,32 +296,53 @@ class ISLSequenceParquetDataset(Dataset):
 # ===========================================================================
 # 3. Model Architecture
 # ===========================================================================
+class ResBlock1D(nn.Module):
+    def __init__(self, channels: int, dropout: float = 0.25):
+        super().__init__()
+        self.conv1 = nn.Conv1d(channels, channels, 3, padding=1)
+        self.bn1 = nn.BatchNorm1d(channels)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv1d(channels, channels, 3, padding=1)
+        self.bn2 = nn.BatchNorm1d(channels)
+        self.drop = nn.Dropout(dropout)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        res = x
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.drop(x)
+        x = self.bn2(self.conv2(x))
+        return self.relu(x + res)
+
 class Tier1TemporalCNN(nn.Module):
     def __init__(self, in_features: int = 152, num_classes: int = 263, dropout: float = 0.25):
         super().__init__()
-        self.conv1 = nn.Conv1d(in_features, 128, 3, padding=1)
-        self.bn1 = nn.BatchNorm1d(128)
-        self.relu1 = nn.ReLU()
-        self.drop1 = nn.Dropout(dropout)
-
-        self.conv2 = nn.Conv1d(128, 256, 3, padding=1)
-        self.bn2 = nn.BatchNorm1d(256)
-        self.relu2 = nn.ReLU()
-        self.drop2 = nn.Dropout(dropout)
-
-        self.conv3 = nn.Conv1d(256, 256, 3, padding=1)
-        self.bn3 = nn.BatchNorm1d(256)
-        self.relu3 = nn.ReLU()
-
+        self.stem = nn.Sequential(
+            nn.Conv1d(in_features, 256, 3, padding=1),
+            nn.BatchNorm1d(256),
+            nn.ReLU()
+        )
+        self.layer1 = ResBlock1D(256, dropout)
+        self.layer2 = ResBlock1D(256, dropout)
+        self.layer3 = ResBlock1D(256, dropout)
+        self.layer4 = ResBlock1D(256, dropout)
+        
         self.pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(256, num_classes)
+        self.fc = nn.Sequential(
+            nn.Linear(256, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, num_classes)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, T=150, F=152) -> transpose to (B, 152, T)
         x = x.transpose(1, 2)
-        x = self.drop1(self.relu1(self.bn1(self.conv1(x))))
-        x = self.drop2(self.relu2(self.bn2(self.conv2(x))))
-        x = self.relu3(self.bn3(self.conv3(x)))
+        x = self.stem(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
         x = self.pool(x).squeeze(-1)
         return self.fc(x)
 
