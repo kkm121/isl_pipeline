@@ -56,11 +56,45 @@ try:
     isign_df = pd.read_csv(io.BytesIO(csv_bytes))
     print(f"Loaded iSign parallel text corpus: {len(isign_df):,} sentences.")
 except Exception as e:
-    print(f"Notice: Streaming fallback - {e}")
-    isign_df = pd.DataFrame({
-        "uid": [f"seq_{i}" for i in range(1000)],
-        "text": ["The government sanctioned thirty crore rupees for student scholarships" for _ in range(1000)]
-    })
+    raise RuntimeError(f"Failed to stream official iSign dataset from Hugging Face: {e}")
+
+class ISignParallelDataset(Dataset):
+    def __init__(self, meta_df: pd.DataFrame, data_dir: str = "/kaggle/input", seq_len: int = 30):
+        self.meta = meta_df.to_dict('records')
+        self.data_dir = data_dir
+        self.seq_len = seq_len
+        self.vocab = {chr(i): i for i in range(32, 127)}
+
+    def __len__(self) -> int:
+        return len(self.meta)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        row = self.meta[idx]
+        text = str(row.get("text", ""))
+        rel_p = str(row.get("latent_path", row.get("uid", "") + "_latent.pt"))
+        abs_p = os.path.join(self.data_dir, rel_p)
+        
+        if not os.path.exists(abs_p):
+             import glob
+             matches = glob.glob(os.path.join(self.data_dir, "**", os.path.basename(rel_p)), recursive=True)
+             if matches:
+                 abs_p = matches[0]
+             else:
+                 raise RuntimeError(f"Latent feature file {rel_p} not found in {self.data_dir}")
+        
+        latent = torch.load(abs_p) # Expected to be (SeqLen, InFeatures=256)
+        
+        if latent.shape[0] > self.seq_len:
+            latent = latent[:self.seq_len]
+        elif latent.shape[0] < self.seq_len:
+            pad = torch.zeros(self.seq_len - latent.shape[0], latent.shape[1], dtype=latent.dtype)
+            latent = torch.cat([latent, pad], dim=0)
+
+        target_tokens = [self.vocab.get(c, 0) for c in text[:self.seq_len]]
+        if len(target_tokens) < self.seq_len:
+            target_tokens += [0] * (self.seq_len - len(target_tokens))
+            
+        return latent.to(torch.float32), torch.tensor(target_tokens, dtype=torch.long)
 
 # 2. Conversational Intent & Knowledge Engine
 CHATBOT_KNOWLEDGE_BASE = {
@@ -130,17 +164,19 @@ BATCH_SIZE = 32
 t_start = time.time()
 best_loss = float("inf")
 
+train_dataset = ISignParallelDataset(isign_df)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+
 print(f"\nFine-tuning Tier-3 LoRA Adapter on iSign parallel corpus for {EPOCHS} Epochs on T4 GPU...")
 
 for epoch in range(EPOCHS):
     model.train()
     total_loss = 0.0
-    num_steps = min(300, len(isign_df) // BATCH_SIZE)
+    num_steps = len(train_loader)
 
-    for step in range(num_steps):
-        # Latent token sequences: (Batch, SeqLen=30, InFeatures=256)
-        x_latent = torch.randn(BATCH_SIZE, 30, 256, device=device)
-        y_tokens = torch.randint(0, 5000, (BATCH_SIZE, 30), device=device)
+    for x_latent, y_tokens in train_loader:
+        x_latent = x_latent.to(device)
+        y_tokens = y_tokens.to(device)
 
         optimizer.zero_grad()
         with torch.amp.autocast("cuda", enabled=torch.cuda.is_available()):

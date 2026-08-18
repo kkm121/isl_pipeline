@@ -104,10 +104,10 @@ print(f"Total Classes: {num_classes} | Disjoint Splits -> Train: {len(train_meta
 # 2. Sequence Dataset Loader
 # ==========================================
 class GISLRDataset(Dataset):
-    def __init__(self, meta_df, data_dir, class_to_idx, max_len=150):
-        self.samples = []
-        self.max_len = max_len
-        self.class_to_idx = class_to_idx
+    def __init__(self, meta_df: pd.DataFrame, data_dir: str, class_to_idx: dict[str, int], max_len: int = 150) -> None:
+        self.samples: list[tuple[str, int]] = []
+        self.max_len: int = max_len
+        self.class_to_idx: dict[str, int] = class_to_idx
 
         for _, row in meta_df.iterrows():
             rel_p = str(row[path_col])
@@ -122,10 +122,10 @@ class GISLRDataset(Dataset):
             self.samples.append((abs_p, lbl))
         print(f"Loaded {len(self.samples)} valid sequence parquet files.")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         path, label = self.samples[idx]
         df = pd.read_parquet(path)
         if "x" in df.columns and "y" in df.columns and "type" in df.columns:
@@ -160,7 +160,7 @@ class GISLRDataset(Dataset):
 # 3. Model Architecture
 # ==========================================
 class Tier1TemporalCNN(nn.Module):
-    def __init__(self, in_features=152, num_classes=263, dropout=0.25):
+    def __init__(self, in_features: int = 152, num_classes: int = 263, dropout: float = 0.25) -> None:
         super().__init__()
         self.conv1 = nn.Conv1d(in_features, 128, 3, padding=1)
         self.bn1 = nn.BatchNorm1d(128)
@@ -179,7 +179,7 @@ class Tier1TemporalCNN(nn.Module):
         self.pool = nn.AdaptiveAvgPool1d(1)
         self.fc = nn.Linear(256, num_classes)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.transpose(1, 2)
         x = self.drop1(self.relu1(self.bn1(self.conv1(x))))
         x = self.drop2(self.relu2(self.bn2(self.conv2(x))))

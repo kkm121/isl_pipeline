@@ -60,8 +60,62 @@ try:
     isign_meta = pd.read_csv(io.BytesIO(csv_bytes))
     print(f"Successfully loaded official iSign metadata: {len(isign_meta):,} continuous sentence segments.")
 except Exception as e:
-    print(f"Notice: Streaming fallback - {e}")
-    isign_meta = pd.DataFrame({"uid": [f"seq_{i}" for i in range(1000)], "text": ["Continuous ISL sentence translation" for _ in range(1000)]})
+    raise RuntimeError(f"Failed to stream official iSign dataset from Hugging Face: {e}")
+
+# Dataset loader
+class ISignContinuousDataset(Dataset):
+    def __init__(self, meta_df: pd.DataFrame, data_dir: str = "/kaggle/input", max_len: int = 150):
+        self.meta = meta_df.to_dict('records')
+        self.max_len = max_len
+        self.data_dir = data_dir
+        # Basic character vocab for CTC
+        self.vocab = {chr(i): i for i in range(32, 127)}
+
+    def __len__(self) -> int:
+        return len(self.meta)
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, int]:
+        row = self.meta[idx]
+        text = str(row.get("text", ""))
+        rel_p = str(row.get("path", row.get("file", row.get("video", ""))))
+        abs_p = os.path.join(self.data_dir, rel_p)
+        
+        if not os.path.exists(abs_p):
+             # Try recursive search if direct path fails
+             import glob
+             matches = glob.glob(os.path.join(self.data_dir, "**", os.path.basename(rel_p)), recursive=True)
+             if matches:
+                 abs_p = matches[0]
+             else:
+                 raise RuntimeError(f"Data file {rel_p} not found in {self.data_dir}")
+
+        df = pd.read_parquet(abs_p)
+        if "x" in df.columns and "y" in df.columns and "type" in df.columns:
+            pivoted = df.pivot(index="frame", columns=["type", "landmark_index"], values=["x", "y"]).fillna(0.0)
+            seq = pivoted.values.astype(np.float32)
+            seq = seq.reshape(-1, 76, 2)
+        else:
+            x_cols = sorted([c for c in df.columns if c.startswith("x")])[:76]
+            y_cols = sorted([c for c in df.columns if c.startswith("y")])[:76]
+            seq = df[x_cols + y_cols].fillna(0.0).values.astype(np.float32)
+            seq = seq.reshape(-1, 76, 2)
+
+        T = seq.shape[0]
+        if T > self.max_len:
+            seq = seq[:self.max_len]
+        elif T < self.max_len:
+            seq = np.concatenate([seq, np.zeros((self.max_len - T, 76, 2), dtype=np.float32)])
+            
+        target = [self.vocab.get(c, 0) for c in text]
+        return torch.tensor(seq, dtype=torch.float32), torch.tensor(target, dtype=torch.long), len(target)
+
+def collate_fn(batch: List[Tuple[torch.Tensor, torch.Tensor, int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    seqs, targets, target_lens = zip(*batch)
+    seqs = torch.stack(seqs)
+    targets = torch.cat(targets)
+    target_lens_t = torch.tensor(target_lens, dtype=torch.long)
+    input_lens = torch.full((len(batch),), seqs.shape[1], dtype=torch.long)
+    return seqs, targets, input_lens, target_lens_t
 
 # 2. Tier-2 Model Architecture: ST-GCN + Multi-Head Self-Attention
 class STGCNBlock(nn.Module):
@@ -119,21 +173,21 @@ SEQ_LEN = 150
 t_start = time.time()
 best_loss = float("inf")
 
+train_dataset = ISignContinuousDataset(isign_meta, max_len=SEQ_LEN)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn, num_workers=2)
+
 print(f"\nTraining Tier-2 Continuous SignFormer for {EPOCHS} Epochs on T4 GPU...")
 
 for epoch in range(EPOCHS):
     model.train()
     epoch_loss = 0.0
-    num_batches = min(200, len(isign_meta) // BATCH_SIZE)
+    num_batches = len(train_loader)
 
-    for step in range(num_batches):
-        # Continuous landmark tensor: (Batch, SeqLen=150, Joints=76, Coord=2)
-        x_batch = torch.randn(BATCH_SIZE, SEQ_LEN, 76, 2, device=device) * 0.1
-        
-        # CTC targets: variable sequence lengths (e.g. 5-15 sign tokens per sentence)
-        target_lens = torch.randint(5, 15, (BATCH_SIZE,), device=device)
-        targets = torch.randint(1, 4999, (target_lens.sum().item(),), device=device)
-        input_lens = torch.full((BATCH_SIZE,), SEQ_LEN, dtype=torch.long, device=device)
+    for x_batch, targets, input_lens, target_lens in train_loader:
+        x_batch = x_batch.to(device)
+        targets = targets.to(device)
+        input_lens = input_lens.to(device)
+        target_lens = target_lens.to(device)
 
         optimizer.zero_grad()
         with torch.amp.autocast("cuda", enabled=torch.cuda.is_available()):
