@@ -25,16 +25,17 @@ The architecture employs **9 specialized agents**, each with a strict single res
 | 8 | **Verify Agent** | **Gemini 3.7 Flash** | **Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Executes `mypy`, `ruff`, `pytest` inside sealed Docker sandbox | `linter_test_mcp` (`STATIC_VERIFY`/`DYNAMIC_VERIFY`) |
 | 9 | **Researcher** | **Gemini 3.7 Flash** | **Low-Medium** | Gemini 3.6 Flash → Gemini 3.5 Flash | Codebase indexing, dependency analysis, academic paper research | `read_file`, `list_directory`, web search (Read-only) |
 
-### Strict Mandates: Evidence-First & Zero-Bias
-1. **Numbers Over Claims**: No agent is permitted to trust qualitative statements ("it works", "it is fast", "looks good"). All conclusions require raw machine-verifiable data:
+### Strict Mandates: Evidence-First, Zero-Synthetic-Data & Zero-Bias
+1. **Zero-Synthetic-Data Policy**: All model training, evaluation metrics, benchmarks, and test fixtures MUST use real-world human sign language recordings and verified dataset splits (e.g., AI4Bharat INCLUDE, real MediaPipe datasets). Artificial Gaussian numbers, simulated toy kinematic curves, and synthetic score inflation are STRICTLY PROHIBITED across all agent tasks.
+2. **Numbers Over Claims**: No agent is permitted to trust qualitative statements ("it works", "it is fast", "looks good"). All conclusions require raw machine-verifiable data:
    - `exit_code == 0` from sealed Docker containers (`--network=none --read-only`).
-   - Pytest summary strings (e.g. `68 passed in 3.59s`).
+   - Pytest summary strings (e.g. `92 passed in 4.39s`).
    - Mypy `0 issues found in X source files`.
-   - Exact benchmark numbers (ms latency, MB peak VRAM, F1-scores).
+   - Exact benchmark numbers computed against real test splits (ms latency, MB peak VRAM, F1-scores, Top-1/Top-5 accuracy).
    - Git tree diff against `.state/tree_baseline.sha` proving physical modifications.
-2. **Anti-Bias Rule**: All LLMs are strictly instructed to disregard user optimism, agent self-reporting, or pressure to "just approve". If evidence is absent or incomplete, the action is **REJECTED**.
-3. **Critic & Principal Interaction**:
-   - The **Critic Agent** audits all intermediate agent outputs and flags potential flaws, data leakage, or silent regressions.
+3. **Anti-Bias Rule**: All LLMs are strictly instructed to disregard user optimism, agent self-reporting, or pressure to "just approve". If evidence is absent or incomplete, the action is **REJECTED**.
+4. **Critic & Principal Interaction**:
+   - The **Critic Agent** audits all intermediate agent outputs and flags potential flaws, data leakage, synthetic shortcuts, or silent regressions.
    - The **Principal Engineer** (Opus 4.6) ingests the Critic's findings and instructs the other LLMs (Code Writer, Test Engineer, ML-Ops) exactly what to fix.
 
 ### Dynamic Reasoning Levels

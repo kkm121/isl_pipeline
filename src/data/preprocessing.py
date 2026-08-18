@@ -284,3 +284,30 @@ def augment_landmarks(
     noise = np.random.normal(0, noise_std, landmarks.shape)
     scale = np.random.uniform(scale_range[0], scale_range[1])
     return (landmarks * scale) + noise
+
+
+def extract_86_hand_features(landmarks: np.ndarray) -> np.ndarray:
+    """Extracts 86-dimensional hand geometry feature vector.
+
+    (63 wrist-relative coords + 20 pairwise distances + 3 bounding extents)
+    """
+    if landmarks.ndim == 3:  # (seq_len, 21, 3) or (seq_len, 76, 3)
+        feats = []
+        for t in range(landmarks.shape[0]):
+            hand_kp = landmarks[t, :21, :] if landmarks.shape[1] >= 21 else landmarks[t, :, :]
+            wrist = hand_kp[0:1, :]
+            rel = hand_kp - wrist
+            rel_flat = rel.flatten()
+            dists = np.linalg.norm(rel[1:], axis=1)
+            extents = rel.max(axis=0) - rel.min(axis=0)
+            feats.append(np.concatenate([rel_flat, dists, extents]))
+        return np.array(feats, dtype=np.float32)
+
+    # 2D (21, 3) or (76, 3)
+    hand_kp = landmarks[:21, :] if landmarks.shape[0] >= 21 else landmarks
+    wrist = hand_kp[0:1, :]
+    rel = hand_kp - wrist
+    rel_flat = rel.flatten()
+    dists = np.linalg.norm(rel[1:], axis=1)
+    extents = rel.max(axis=0) - rel.min(axis=0)
+    return np.concatenate([rel_flat, dists, extents]).astype(np.float32)

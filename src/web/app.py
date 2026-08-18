@@ -9,12 +9,10 @@ Features:
 
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
 import numpy as np
-import torch
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -48,23 +46,20 @@ app.add_middleware(
 # Initialize Model & Pipelines
 # -------------------------------------------------------------
 DEVICE = "cpu"
-NUM_CLASSES = 200
-CHECKPOINT_PATH = str(PROJECT_ROOT / "kaggle_output" / "tier1_best.pth")
+REAL_CHECKPOINT = PROJECT_ROOT / "models" / "tier1_real_isl.pth"
+KAGGLE_CHECKPOINT = PROJECT_ROOT / "kaggle_output" / "tier1_best.pth"
 
-t1_cfg = Tier1ModelConfig(num_classes=NUM_CLASSES, input_size=152)
-model = Tier1TemporalCNN(config=t1_cfg)
-
-if os.path.exists(CHECKPOINT_PATH):
-    try:
-        ckpt = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
-        state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
-        model_dict = model.state_dict()
-        pretrained_dict = {k: v for k, v in state_dict.items() if k in model_dict and model_dict[k].shape == v.shape}
-        model_dict.update(pretrained_dict)
-        model.load_state_dict(model_dict)
-        logger.info(f"Loaded {len(pretrained_dict)} layers from {CHECKPOINT_PATH}")
-    except Exception as e:
-        logger.warning(f"Failed to load checkpoint: {e}")
+if REAL_CHECKPOINT.exists():
+    model = Tier1TemporalCNN.load(str(REAL_CHECKPOINT), device=DEVICE)
+    logger.info(
+        f"Loaded Real-Dataset Trained Model from {REAL_CHECKPOINT} (Classes={model.config.num_classes}, Input={model.config.input_size})"
+    )
+elif KAGGLE_CHECKPOINT.exists():
+    model = Tier1TemporalCNN.load(str(KAGGLE_CHECKPOINT), device=DEVICE)
+    logger.info(f"Loaded Model Checkpoint from {KAGGLE_CHECKPOINT}")
+else:
+    t1_cfg = Tier1ModelConfig(num_classes=26, input_size=86)
+    model = Tier1TemporalCNN(config=t1_cfg)
 
 model.eval()
 
@@ -72,6 +67,7 @@ pipe_cfg = PipelineConfig()
 pipe_cfg.buffer.window_size = 45
 pipe_cfg.buffer.step_size = 5
 pipe_cfg.buffer.consensus_frames = 3
+pipe_cfg.buffer.min_confidence = 0.40
 
 
 synthesis_engine = RegionalSynthesisEngine()
@@ -98,8 +94,8 @@ async def health_check():
         "status": "healthy",
         "model": "Tier1TemporalCNN",
         "device": DEVICE,
-        "classes_count": NUM_CLASSES,
-        "checkpoint_loaded": os.path.exists(CHECKPOINT_PATH),
+        "classes_count": getattr(model.config, "num_classes", 26),
+        "checkpoint_loaded": REAL_CHECKPOINT.exists() or KAGGLE_CHECKPOINT.exists(),
     }
 
 
@@ -185,7 +181,7 @@ async def websocket_stream_endpoint(websocket: WebSocket):
     session_predictor = StreamingSignPredictor(
         model=model,
         config=pipe_cfg,
-        class_names=CLASSROOM_VOCABULARY_200,
+        class_names=CLASSROOM_VOCABULARY_200[: model.config.num_classes],
         device=DEVICE,
     )
 

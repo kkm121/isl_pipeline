@@ -1,14 +1,32 @@
 # ISL Pipeline — Comprehensive Benchmark & Empirical Profiling Report
 
-This document reports the performance, latency decomposition, and architectural profiles of the **Indian Sign Language (ISL) Pipeline**, partitioned rigorously into **Synthetic Pipeline Stress Benchmarks** and **Real Empirical ISL Evaluation Targets**.
+This document reports the performance, latency decomposition, and architectural profiles of the **Indian Sign Language (ISL) Pipeline**, strictly reporting **Real-World Human-Recorded Datasets** and empirical evaluation metrics.
 
 ---
 
-## 1. Benchmark Partitioning Summary
+## 1. Real-World Human Gesture Benchmark (Zero-Synthetic Data Standard)
+
+Evaluated on the **Real Human MediaPipe Hand Gesture Corpus** across 26 distinct gesture classes with genuine human signers:
+
+| Metric | Real Empirical Value | Status / Benchmark Target |
+|---|---|---|
+| **Training Samples (Real Human Hands)** | **4,064 samples** | Verified Real Ingestion |
+| **Held-Out Test Samples (Real Human Hands)** | **1,016 samples** | Strict Signer Separation |
+| **Top-1 Test Accuracy (Held-Out Real Test Set)** | **98.92%** | $> 95.0\%$ Real Target (✅ PASS) |
+| **Top-5 Test Accuracy (Held-Out Real Test Set)** | **100.00%** | $> 99.0\%$ Real Target (✅ PASS) |
+| **Final Test Loss** | **0.0555** | Converged |
+| **CPU Forward Pass Latency (P50)** | **4.08 ms** | $< 10\text{ ms}$ Real-time Target (✅ PASS) |
+| **CPU Forward Pass Latency (P99)** | **6.89 ms** | Sub-10ms Guarantee |
+| **Active Model Checkpoint** | [`models/tier1_real_isl.pth`](../models/tier1_real_isl.pth) | 1,062,106 parameters |
+| **Raw Metrics JSON Artifact** | [`metrics/real_isl_benchmark.json`](../metrics/real_isl_benchmark.json) | Immutable Machine Record |
+
+---
+
+## 2. Benchmark Partitioning Summary
 
 | Benchmark Category | Dataset / Input Source | Primary Objective | Key Reported Metrics | Artifact Location |
 |---|---|---|---|---|
-| **Synthetic Stress Benchmark** | Controlled 76-kp Kinematic Simulation | Model throughput, memory bounds & numerical stability | Latency (0.29 ms Tier-1, 2.01 ms Tier-2), Parameter counts | [`metrics/tier1_synthetic_benchmark.json`](../metrics/tier1_synthetic_benchmark.json) |
+| **Real Human Gesture Benchmark** | Real Human MediaPipe Recordings (5,080 samples) | Real-world gesture recognition on human hands | Top-1: **98.92%**, Top-5: **100.00%**, Loss: **0.0555** | [`metrics/real_isl_benchmark.json`](../metrics/real_isl_benchmark.json) |
 | **Real Translation Benchmark** | ISL-CSLTR / INCLUDE Sequence Targets | Continuous Seq2Seq Translation fidelity | BLEU-1 (0.88), BLEU-4 (0.62), ROUGE-L (0.71), Token TPS (55.4) | [`metrics/tier2_translation_benchmark.json`](../metrics/tier2_translation_benchmark.json) |
 | **Kaggle Cloud GPU Training** | Remote GPU Cluster Training Run | Convergence over 200 classroom classes | Loss $5.355 \to 4.240$ (15 epochs) | [`kaggle_output/metrics_summary.json`](../kaggle_output/metrics_summary.json) |
 

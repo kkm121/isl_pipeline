@@ -14,6 +14,7 @@ from src.data.dataset import CLASSROOM_VOCABULARY_200
 from src.data.preprocessing import (
     LandmarkExtractor,
     extract_2d_pose_vector,
+    extract_86_hand_features,
     flatten_landmarks,
     interpolate_missing_landmarks,
     normalize_landmarks,
@@ -136,17 +137,22 @@ class StreamingSignPredictor:
 
         # Execute Model Inference
         self.state = UIStreamState.PROCESSING
-        seq = np.stack(list(self.landmark_buffer))
-        seq = interpolate_missing_landmarks(seq)
-        seq = normalize_landmarks(seq)
-        seq = pad_sequence(seq, self.config.data.sequence_length)
-
-        # Coordinate extraction: check if model expects 152-dim (76 * 2) or config specifies 2D
+        raw_seq = np.stack(list(self.landmark_buffer))
         expected_input = getattr(self.model.config, "input_size", 152)
-        if (expected_input == 152 or getattr(self.config.data, "landmark_dim", 2) == 2) and seq.shape[-1] > 2:
-            seq = extract_2d_pose_vector(seq)
+
+        if raw_seq.ndim == 2 and raw_seq.shape[-1] == expected_input:
+            seq = pad_sequence(raw_seq, self.config.data.sequence_length)
+        elif expected_input == 86:
+            seq = extract_86_hand_features(raw_seq)
+            seq = pad_sequence(seq, self.config.data.sequence_length)
         else:
-            seq = flatten_landmarks(seq)
+            seq = interpolate_missing_landmarks(raw_seq)
+            seq = normalize_landmarks(seq)
+            seq = pad_sequence(seq, self.config.data.sequence_length)
+            if (expected_input == 152 or getattr(self.config.data, "landmark_dim", 2) == 2) and seq.shape[-1] > 2:
+                seq = extract_2d_pose_vector(seq)
+            else:
+                seq = flatten_landmarks(seq)
 
         tensor = torch.tensor(seq, dtype=torch.float32).unsqueeze(0).to(self.device)
 
