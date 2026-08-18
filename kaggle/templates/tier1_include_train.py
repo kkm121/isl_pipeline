@@ -3,8 +3,9 @@
 TIER 1: ISOLATED SIGN SPATIAL-TEMPORAL FEATURE EXTRACTOR (263 ISL CLASSES)
 =============================================================================
 Hardware: NVIDIA T4 / Dual T4 (Kaggle Accelerator: GPU T4 x2)
-Dataset: swaptr/indian-sign-language-mediapipe-holistic-landmarks (Kaggle Input)
-Estimated Duration: ~25 to 45 minutes (15-25 Epochs)
+Dataset: swaptr/indian-sign-language-mediapipe-holistic-landmarks
+Auto-Download: Uses kagglehub to auto-fetch dataset if not manually attached
+Estimated Duration: ~25 to 45 minutes (15-20 Epochs)
 Output: /kaggle/working/tier1_include_best.pth & tier1_metrics.json
 =============================================================================
 """
@@ -12,6 +13,7 @@ Output: /kaggle/working/tier1_include_best.pth & tier1_metrics.json
 import glob
 import json
 import os
+import sys
 import time
 import numpy as np
 import pandas as pd
@@ -21,36 +23,66 @@ import torch.optim as optim
 from sklearn.metrics import accuracy_score
 from torch.utils.data import DataLoader, Dataset
 
-print("=== [TIER 1] STARTING ISL FEATURE EXTRACTOR TRAINING ===")
+print("=" * 80)
+print("=== [TIER 1] ISL SPATIAL-TEMPORAL FEATURE EXTRACTOR (263 CLASSES) ===")
+print("=" * 80)
 print(f"PyTorch Version: {torch.__version__}")
 print(f"CUDA Available: {torch.cuda.is_available()}")
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
-    print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+    print(f"✅ GPU DETECTED: {torch.cuda.get_device_name(0)}")
+    print(f"   Total VRAM: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
 else:
     device = torch.device("cpu")
-    print("Warning: CUDA not detected, using CPU.")
+    print("⚠️ WARNING: Running on CPU.")
+    print("   👉 For 10x faster training: Go to Notebook Settings (right panel) -> Accelerator -> select 'GPU T4 x2'!")
 
 OUTPUT_DIR = "/kaggle/working"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# 1. Ingest Dataset
-DATA_DIR = "/kaggle/input/indian-sign-language-mediapipe-holistic-landmarks"
-if not os.path.exists(DATA_DIR):
-    candidates = glob.glob("/kaggle/input/**/train.csv", recursive=True)
-    if candidates:
-        DATA_DIR = os.path.dirname(candidates[0])
+# ==========================================
+# 1. Dataset Discovery & Auto-Download
+# ==========================================
+print("\n[Step 1] Locating ISL Dataset...")
+
+# Search in /kaggle/input
+DATA_DIR = None
+input_dirs = glob.glob("/kaggle/input/**/train.csv", recursive=True)
+if input_dirs:
+    DATA_DIR = os.path.dirname(input_dirs[0])
+    print(f"✅ Found dataset in /kaggle/input: {DATA_DIR}")
+else:
+    print("Dataset not pre-attached in /kaggle/input. Auto-downloading via kagglehub...")
+    try:
+        import kagglehub
+        download_path = kagglehub.dataset_download("swaptr/indian-sign-language-mediapipe-holistic-landmarks")
+        DATA_DIR = download_path
+        print(f"✅ Auto-downloaded dataset via kagglehub: {DATA_DIR}")
+    except Exception as e:
+        print(f"kagglehub download notice: {e}")
+
+# If still not found, search all parquet files in input or root
+if not DATA_DIR or not os.path.exists(os.path.join(DATA_DIR, "train.csv")):
+    all_csvs = glob.glob("**/train.csv", recursive=True)
+    if all_csvs:
+        DATA_DIR = os.path.dirname(all_csvs[0])
+        print(f"Discovered train.csv at: {DATA_DIR}")
     else:
-        raise FileNotFoundError(f"Dataset not found at {DATA_DIR}. Please attach 'swaptr/indian-sign-language-mediapipe-holistic-landmarks'.")
+        raise FileNotFoundError(
+            "Could not locate train.csv. "
+            "Please click '+ Add Data' in the right sidebar and search 'swaptr/indian-sign-language-mediapipe-holistic-landmarks'!"
+        )
 
 csv_path = os.path.join(DATA_DIR, "train.csv")
 metadata = pd.read_csv(csv_path)
-print(f"Loaded train.csv ({len(metadata)} samples).")
+print(f"Loaded train.csv with {len(metadata):,} sequence samples.")
 
 signer_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["participant", "signer"])), metadata.columns[1])
 sign_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["sign", "label", "gloss"])), metadata.columns[-1])
 path_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["path", "file", "video", "sequence"])), metadata.columns[0])
+
+print(f"Schema Mapping -> Signer: '{signer_col}', Sign Gloss: '{sign_col}', Sequence Path: '{path_col}'")
 
 unique_signers = sorted(metadata[signer_col].unique())
 n_s = len(unique_signers)
@@ -65,9 +97,12 @@ test_meta = metadata[metadata[signer_col].isin(test_signers)]
 classes = sorted(metadata[sign_col].unique())
 num_classes = len(classes)
 class_to_idx = {c: i for i, c in enumerate(classes)}
-print(f"Classes: {num_classes} | Signer Splits: Train={len(train_meta)}, Val={len(val_meta)}, Test={len(test_meta)}")
+print(f"Total Classes: {num_classes} | Disjoint Splits -> Train: {len(train_meta)}, Val: {len(val_meta)}, Test: {len(test_meta)}")
 
 
+# ==========================================
+# 2. Sequence Dataset Loader
+# ==========================================
 class GISLRDataset(Dataset):
     def __init__(self, meta_df, data_dir, class_to_idx, max_len=150):
         self.samples = []
@@ -121,6 +156,9 @@ class GISLRDataset(Dataset):
         return torch.tensor(seq, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
 
 
+# ==========================================
+# 3. Model Architecture
+# ==========================================
 class Tier1TemporalCNN(nn.Module):
     def __init__(self, in_features=152, num_classes=263, dropout=0.25):
         super().__init__()
@@ -160,11 +198,14 @@ train_loader = DataLoader(GISLRDataset(train_meta, DATA_DIR, class_to_idx), batc
 val_loader = DataLoader(GISLRDataset(val_meta, DATA_DIR, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
 test_loader = DataLoader(GISLRDataset(test_meta, DATA_DIR, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
 
+# ==========================================
+# 4. Training Loop
+# ==========================================
 EPOCHS = 20
 best_val_acc = 0.0
 t_start = time.time()
 
-print(f"\nTraining Tier-1 for {EPOCHS} Epochs on T4 GPU...")
+print(f"\n[Step 2] Training Tier-1 for {EPOCHS} Epochs on {device}...")
 for epoch in range(EPOCHS):
     model.train()
     tot_loss, correct, total = 0.0, 0, 0
