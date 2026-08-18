@@ -1,5 +1,7 @@
 import logging
-from typing import Optional, Tuple
+import math
+import random
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -323,3 +325,214 @@ def extract_86_hand_features(landmarks: np.ndarray) -> np.ndarray:
     dists = np.linalg.norm(rel[1:], axis=1)
     extents = rel.max(axis=0) - rel.min(axis=0)
     return np.concatenate([rel_flat, dists, extents]).astype(np.float32)
+
+
+# ==============================================================================
+# SOTA Feature Extraction (328 Dimensions) & Data Augmentations
+# ==============================================================================
+
+SOTA_DISTANCE_PAIRS_24: List[Tuple[int, int]] = [
+    (0, 1), (0, 2), (0, 3), (0, 4),      # Nose to face / head reference
+    (10, 20), (11, 21), (12, 22), (13, 23),  # Left hand: wrist to fingertips / knuckles
+    (20, 24), (20, 28), (20, 32), (20, 36),  # Left hand: thumb to other fingertips
+    (40, 50), (41, 51), (42, 52), (43, 53),  # Right hand: wrist to fingertips / knuckles
+    (50, 54), (50, 58), (50, 62), (50, 66),  # Right hand: thumb to other fingertips
+    (20, 50), (24, 54), (0, 20), (0, 50),    # Inter-hand & hand-to-nose
+]
+
+
+def spatial_rotation(
+    landmarks: np.ndarray,
+    angle_deg: Optional[float] = None,
+    max_angle_deg: float = 15.0,
+) -> np.ndarray:
+    """Random spatial 2D rotation of landmark coordinates around centroid.
+
+    Args:
+        landmarks: Array of shape (..., V, 2) or (..., V, C>=2)
+        angle_deg: Specific rotation angle in degrees (if None, sampled from [-max_angle_deg, max_angle_deg])
+        max_angle_deg: Maximum rotation angle in degrees
+
+    Returns:
+        Rotated landmarks array maintaining the same shape and non-NaN finite values.
+    """
+    if landmarks.size == 0:
+        return landmarks.copy()
+
+    seq = landmarks.copy()
+    if angle_deg is None:
+        angle_deg = random.uniform(-max_angle_deg, max_angle_deg)
+
+    rad = math.radians(angle_deg)
+    cos_a, sin_a = math.cos(rad), math.sin(rad)
+    rot_mat = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=seq.dtype)
+
+    xy = seq[..., :2]
+    # Center around spatial centroid
+    center = np.mean(xy, axis=-2, keepdims=True)
+    centered = xy - center
+    rotated = np.matmul(centered, rot_mat.T) + center
+    seq[..., :2] = rotated
+    return seq
+
+
+def scale_jitter(
+    landmarks: np.ndarray,
+    scale: Optional[float] = None,
+    scale_range: Tuple[float, float] = (0.85, 1.15),
+    trans_range: float = 0.05,
+) -> np.ndarray:
+    """Random scaling and translation jitter on landmark coordinates.
+
+    Args:
+        landmarks: Array of shape (..., V, 2) or (..., V, C>=2)
+        scale: Specific scaling multiplier (if None, sampled from scale_range)
+        scale_range: (min_scale, max_scale)
+        trans_range: Maximum translation offset
+
+    Returns:
+        Scaled & jittered array maintaining same shape and non-NaN finite values.
+    """
+    if landmarks.size == 0:
+        return landmarks.copy()
+
+    seq = landmarks.copy()
+    if scale is None:
+        scale = random.uniform(scale_range[0], scale_range[1])
+
+    tx = random.uniform(-trans_range, trans_range)
+    ty = random.uniform(-trans_range, trans_range)
+
+    xy = seq[..., :2]
+    center = np.mean(xy, axis=-2, keepdims=True)
+    centered = xy - center
+    scaled = centered * scale + center
+    scaled[..., 0] += tx
+    scaled[..., 1] += ty
+    seq[..., :2] = scaled
+    return seq
+
+
+def landmark_dropout(
+    landmarks: np.ndarray,
+    drop_rate: float = 0.10,
+) -> np.ndarray:
+    """Randomly masks out keypoints with probability drop_rate (sets coordinates to 0.0).
+
+    Args:
+        landmarks: Array of shape (T, V, C) or (V, C)
+        drop_rate: Proportion of keypoints to drop (0.0 to 1.0)
+
+    Returns:
+        Array with dropped keypoints zeroed out, maintaining shape.
+    """
+    if landmarks.size == 0 or drop_rate <= 0.0:
+        return landmarks.copy()
+
+    seq = landmarks.copy()
+    num_kps = seq.shape[-2]
+    mask = np.random.rand(num_kps) > drop_rate
+    # If all landmarks were dropped, keep at least one
+    if not np.any(mask):
+        mask[0] = True
+
+    seq[..., ~mask, :] = 0.0
+    return seq
+
+
+def temporal_speed_warp(
+    landmarks: np.ndarray,
+    speed_factor: Optional[float] = None,
+    speed_range: Tuple[float, float] = (0.8, 1.2),
+    min_frames: int = 8,
+) -> np.ndarray:
+    """Resamples sequence along time axis to simulate signing speed variations.
+
+    Args:
+        landmarks: Array of shape (T, ...)
+        speed_factor: Specific speed multiplier
+        speed_range: (min_speed, max_speed)
+        min_frames: Minimum number of output frames
+
+    Returns:
+        Resampled landmarks array with new length new_T >= min_frames.
+    """
+    if landmarks.ndim < 2 or landmarks.shape[0] <= 1:
+        return landmarks.copy()
+
+    T = landmarks.shape[0]
+    if speed_factor is None:
+        speed_factor = random.uniform(speed_range[0], speed_range[1])
+
+    new_T = max(min_frames, int(round(T * speed_factor)))
+    indices = np.linspace(0, T - 1, new_T).astype(int)
+    return landmarks[indices].copy()
+
+
+def extract_sota_features_328(
+    landmarks: np.ndarray,
+    distance_pairs: Optional[List[Tuple[int, int]]] = None,
+) -> np.ndarray:
+    """Extracts SOTA 328-dimensional multimodal features for Tier-1 transformer.
+
+    Components:
+      - 152 Base coordinates (76 keypoints * 2D x,y)
+      - 152 Velocity vectors (temporal difference: coords[t] - coords[t-1], 0 at t=0)
+      - 24 Key anatomical Euclidean distance pairs
+
+    Total dimensions = 152 + 152 + 24 = 328
+
+    Args:
+        landmarks: Array of shape (T, 76, 2) or (T, 76, 3) or (T, 152) or (76, 2)
+        distance_pairs: List of 24 index pairs (defaults to SOTA_DISTANCE_PAIRS_24)
+
+    Returns:
+        Feature array of shape (T, 328) with dtype float32.
+    """
+    pairs = distance_pairs or SOTA_DISTANCE_PAIRS_24
+
+    # Ensure 3D shape (T, V, C)
+    if landmarks.ndim == 2:
+        if landmarks.shape[1] == 152:
+            # (T, 152) -> (T, 76, 2)
+            T = landmarks.shape[0]
+            seq_2d = landmarks.reshape(T, 76, 2)
+        elif landmarks.shape[0] == 76 and landmarks.shape[1] in (2, 3):
+            # (76, 2) -> (1, 76, 2)
+            seq_2d = landmarks[np.newaxis, :, :2]
+        else:
+            T = landmarks.shape[0]
+            num_kp = min(76, landmarks.shape[1] // 2)
+            seq_2d = np.zeros((T, 76, 2), dtype=np.float32)
+            seq_2d[:, :num_kp, :] = landmarks[:, :num_kp * 2].reshape(T, num_kp, 2)
+    elif landmarks.ndim == 3:
+        T, V, C = landmarks.shape
+        seq_2d = np.zeros((T, 76, 2), dtype=np.float32)
+        num_kp = min(76, V)
+        seq_2d[:, :num_kp, :min(2, C)] = landmarks[:, :num_kp, :min(2, C)]
+    else:
+        raise ValueError(f"Unsupported landmarks shape: {landmarks.shape}")
+
+    T, V, _ = seq_2d.shape
+
+    # 1. Base 76 coordinates (152 dim)
+    base_coords = seq_2d.reshape(T, -1).astype(np.float32)  # (T, 152)
+
+    # 2. Velocity vectors (152 dim)
+    velocities = np.zeros_like(base_coords)
+    if T > 1:
+        velocities[1:] = base_coords[1:] - base_coords[:-1]
+
+    # 3. Euclidean distance pairs (len(pairs) dim, default 24)
+    distances = np.zeros((T, len(pairs)), dtype=np.float32)
+    for i, (i1, i2) in enumerate(pairs):
+        idx1 = min(i1, V - 1)
+        idx2 = min(i2, V - 1)
+        p1 = seq_2d[:, idx1, :]
+        p2 = seq_2d[:, idx2, :]
+        distances[:, i] = np.linalg.norm(p1 - p2, axis=-1)
+
+    # Concatenate: 152 + 152 + 24 = 328
+    features = np.concatenate([base_coords, velocities, distances], axis=-1).astype(np.float32)
+    return features
+

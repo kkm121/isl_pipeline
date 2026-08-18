@@ -77,3 +77,43 @@ class RunningAverage:
     def reset(self) -> None:
         self.total = 0.0
         self.count = 0
+
+
+def calculate_accuracy(
+    output: Any,
+    target: Any,
+    topk: Tuple[int, ...] = (1, 5),
+) -> List[float]:
+    """Computes Top-K classification accuracy percentages.
+
+    Args:
+        output: Predicted logits tensor of shape (B, num_classes)
+        target: Ground truth class indices tensor of shape (B,)
+        topk: Tuple of top-k values to evaluate (e.g. (1, 5))
+
+    Returns:
+        List of accuracy percentages [top1_acc, top5_acc, ...] in [0.0, 100.0]
+    """
+    import torch
+
+    if not isinstance(output, torch.Tensor):
+        output = torch.as_tensor(output)
+    if not isinstance(target, torch.Tensor):
+        target = torch.as_tensor(target)
+
+    with torch.no_grad():
+        num_classes = output.size(1) if output.ndim > 1 else 1
+        batch_size = target.size(0)
+        if batch_size == 0:
+            return [0.0] * len(topk)
+
+        res = []
+        for k in topk:
+            actual_k = min(k, num_classes)
+            _, pred = output.topk(actual_k, dim=1, largest=True, sorted=True)
+            pred = pred.t()
+            correct = pred.eq(target.view(1, -1).expand_as(pred))
+            correct_k = correct.float().sum().item()
+            acc = (correct_k / batch_size) * 100.0
+            res.append(acc)
+        return res
