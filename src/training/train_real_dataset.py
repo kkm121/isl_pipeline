@@ -18,29 +18,35 @@ logger = logging.getLogger(__name__)
 
 
 class RealLandmarkDataset(Dataset[Tuple[torch.Tensor, torch.Tensor]]):
-    """Dataset wrapper for real human MediaPipe hand gesture landmarks."""
+    """Dataset wrapper for real human MediaPipe hand gesture landmarks.
 
-    def __init__(self, X: np.ndarray, y: np.ndarray, seq_len: int = 45, is_train: bool = True):
+    WARNING: This dataset (data/real_landmarks/) contains ASL static fingerspelling
+    frames (26 letters A-Z), NOT real ISL temporal sequences. It is kept as a
+    static gesture baseline only. For real ISL temporal training use
+    src/data/include_dataset.py with the INCLUDE/swaptr Kaggle dataset.
+
+    This class does NOT tile static frames into fake temporal sequences.
+    """
+
+    def __init__(self, X: np.ndarray, y: np.ndarray, is_train: bool = True):
+        if X.ndim != 2:
+            raise ValueError(
+                f"RealLandmarkDataset requires 2D arrays (N, feat_dim), got shape {X.shape}. "
+                "This dataset does NOT tile static frames into temporal sequences. "
+                "Use src/data/include_dataset.py for real ISL temporal training."
+            )
         self.X = X.astype(np.float32)
         self.y = y.astype(np.int64)
-        self.seq_len = seq_len
         self.is_train = is_train
 
     def __len__(self) -> int:
         return len(self.X)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        base_feature = self.X[idx]  # (86,)
-        # Expand into temporal window (seq_len, 86)
-        seq = np.tile(base_feature, (self.seq_len, 1))
-
-        if self.is_train:
-            # Apply organic temporal motion jitter to simulate live video feed
-            noise = np.random.randn(*seq.shape).astype(np.float32) * 0.015
-            drift = np.sin(np.linspace(0, np.pi, self.seq_len)).reshape(-1, 1).astype(np.float32) * 0.01
-            seq = seq + noise + drift
-
-        return torch.tensor(seq, dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.long)
+        # Return the static feature as a single-frame sequence (1, feat_dim)
+        # This is valid only for static gesture classification baselines
+        feat = self.X[idx].reshape(1, -1)  # (1, feat_dim) — no tiling
+        return torch.tensor(feat, dtype=torch.float32), torch.tensor(self.y[idx], dtype=torch.long)
 
 
 def train_real_model(
@@ -74,8 +80,8 @@ def train_real_model(
 
     logger.info(f"Loaded Real Dataset: Train={len(X_train)} samples, Test={len(X_test)} samples, Classes={num_classes}")
 
-    train_ds = RealLandmarkDataset(X_train, y_train, seq_len=seq_len, is_train=True)
-    test_ds = RealLandmarkDataset(X_test, y_test, seq_len=seq_len, is_train=False)
+    train_ds = RealLandmarkDataset(X_train, y_train, is_train=True)
+    test_ds = RealLandmarkDataset(X_test, y_test, is_train=False)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)

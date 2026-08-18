@@ -1,3 +1,6 @@
+# DEPRECATED: This kernel relies on SyntheticISLDataset which is no longer supported.
+# Use real_isl_train_kernel.py instead.
+
 import torch
 import torch.nn as nn
 import torch.optim as optim

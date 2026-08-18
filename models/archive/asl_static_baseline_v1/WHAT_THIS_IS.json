@@ -1,0 +1,11 @@
+{
+  "archived_on": "2026-08-18",
+  "what_this_is": "ASL static fingerspelling baseline \u2014 26 letters A-Z, NOT real ISL temporal",
+  "dataset": "Siruyy/asl-static-landmarks-v1 (HuggingFace)",
+  "dataset_size": "4064 train + 1016 test samples",
+  "num_classes": 26,
+  "feature_dim": 86,
+  "test_accuracy": "98.92% (valid but on static hand poses, not signing sequences)",
+  "WARNING": "This model classifies static hand shapes. It has never seen a video sequence. Do not use for ISL translation.",
+  "superseded_by": "To be filled: isl_include_t4_real.pth (trained on swaptr/INCLUDE + official iSign)"
+}

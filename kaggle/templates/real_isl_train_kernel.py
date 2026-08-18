@@ -18,42 +18,37 @@ class RealISLDataset(Dataset):
         self.labels = []
         self.signers = []
         
-        if os.path.exists(data_dir):
-            for signer_dir in os.listdir(data_dir):
-                signer_path = os.path.join(data_dir, signer_dir)
-                if not os.path.isdir(signer_path):
+        if not os.path.exists(data_dir):
+            raise FileNotFoundError(f"{data_dir} not found. Must provide real data.")
+
+        for signer_dir in os.listdir(data_dir):
+            signer_path = os.path.join(data_dir, signer_dir)
+            if not os.path.isdir(signer_path):
+                continue
+            signer_id = int(signer_dir.replace('signer_', ''))
+            
+            for class_dir in os.listdir(signer_path):
+                class_path = os.path.join(signer_path, class_dir)
+                if not os.path.isdir(class_path):
                     continue
-                signer_id = int(signer_dir.replace('signer_', ''))
+                class_id = int(class_dir.replace('class_', ''))
                 
-                for class_dir in os.listdir(signer_path):
-                    class_path = os.path.join(signer_path, class_dir)
-                    if not os.path.isdir(class_path):
-                        continue
-                    class_id = int(class_dir.replace('class_', ''))
-                    
-                    for sample_file in os.listdir(class_path):
-                        if sample_file.endswith('.npy'):
-                            self.samples.append(os.path.join(class_path, sample_file))
-                            self.labels.append(class_id)
-                            self.signers.append(signer_id)
-        else:
-            print(f"Warning: {data_dir} not found. Generating dummy metadata for template testing.")
-            self.samples = ["dummy_path.npy"] * 1000
-            self.labels = np.random.randint(0, 263, 1000).tolist()
-            self.signers = np.random.randint(1, 16, 1000).tolist()
+                for sample_file in os.listdir(class_path):
+                    if sample_file.endswith('.npy'):
+                        self.samples.append(os.path.join(class_path, sample_file))
+                        self.labels.append(class_id)
+                        self.signers.append(signer_id)
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
         path = self.samples[idx]
-        if os.path.exists(path):
-            feature = np.load(path)
-            feature = torch.tensor(feature, dtype=torch.float32)
-        else:
-            # Dummy fallback for testing: 76 keypoints * T frames (e.g. 50)
-            feature = torch.randn(76, 50) 
-            
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Missing file: {path}")
+        
+        feature = np.load(path)
+        feature = torch.tensor(feature, dtype=torch.float32)
         label = self.labels[idx]
         signer = self.signers[idx]
         return feature, label, signer

@@ -217,10 +217,8 @@ def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
     """Single-anchor coordinate normalization using mid-shoulder reference.
 
     For 76-keypoint holistic topology:
-      - Centers all coordinates around the mid-shoulder anchor (midpoint of indices 43, 44).
-      - Normalizes scale by torso length (distance between mid-shoulder and mid-hip)
-        with bounded max-extent scaling to ensure numerical stability and preserve
-        inter-joint spatial vectors.
+      - Centers all coordinates around the mid-shoulder anchor.
+      - Normalizes scale by torso length.
     For 21-keypoint hand topology:
       - Centers coordinates around the wrist anchor (index 0).
       - Scales by maximum coordinate extent.
@@ -232,7 +230,7 @@ def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
     kps = landmarks.shape[-2]
 
     if kps == 76:
-        # Anchor on mid-shoulder (pose indices 43, 44)
+        # Anchor on mid-shoulder (pose indices 43, 44 in 76-kp topology)
         mid_shoulder = (landmarks[..., 43:44, :] + landmarks[..., 44:45, :]) / 2.0
         centered = landmarks - mid_shoulder
 
@@ -248,6 +246,20 @@ def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
     max_val = np.max(np.abs(centered), axis=(-2, -1), keepdims=True)
     scale = np.where(max_val > 1e-6, max_val, 1.0)
     return centered / scale
+
+
+def adaptive_pad_or_truncate(seq: np.ndarray, max_len: int = 150) -> np.ndarray:
+    """Center-crop if sequence is longer than max_len, otherwise zero-pad at end."""
+    t = seq.shape[0]
+    if t > max_len:
+        start = (t - max_len) // 2
+        return seq[start:start + max_len]
+    elif t < max_len:
+        pad_len = max_len - t
+        pad_shape = (pad_len,) + seq.shape[1:]
+        padding = np.zeros(pad_shape, dtype=seq.dtype)
+        return np.concatenate([seq, padding], axis=0)
+    return seq
 
 
 def extract_2d_pose_vector(landmarks: np.ndarray) -> np.ndarray:

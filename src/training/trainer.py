@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import torch
 from torch import nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 
 from src.models.classifier import ISLClassifier
@@ -54,7 +54,7 @@ class Trainer:
             self.optimizer, T_max=max(self.training_config.epochs, 1)
         )
         self.criterion = nn.CrossEntropyLoss()
-        self.scaler = GradScaler(enabled=self.training_config.mixed_precision and torch.cuda.is_available())
+        self.scaler = GradScaler('cuda', enabled=self.training_config.mixed_precision and torch.cuda.is_available())
 
         log_dir = getattr(self.training_config, "log_dir", "logs/local")
         exp_name = getattr(self.config, "experiment_name", "default") if self.config else "default"
@@ -94,7 +94,7 @@ class Trainer:
             x, y = x.to(self.device), y.to(self.device)
             self.optimizer.zero_grad()
 
-            with autocast(enabled=self.training_config.mixed_precision and torch.cuda.is_available()):
+            with autocast('cuda', enabled=self.training_config.mixed_precision and torch.cuda.is_available()):
                 outputs = self.model(x)
                 loss = self.criterion(outputs, y)
 
