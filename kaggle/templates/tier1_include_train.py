@@ -2,10 +2,9 @@
 =============================================================================
 TIER 1: ISOLATED SIGN SPATIAL-TEMPORAL FEATURE EXTRACTOR (263 ISL CLASSES)
 =============================================================================
-Hardware: NVIDIA T4 / Dual T4 (Kaggle Accelerator: GPU T4 x2)
+Hardware: NVIDIA Tesla T4 (Kaggle Accelerator: GPU T4 x2)
 Dataset: swaptr/indian-sign-language-mediapipe-holistic-landmarks
-Auto-Download: Uses kagglehub to auto-fetch dataset if not manually attached
-Estimated Duration: ~25 to 45 minutes (15-20 Epochs)
+Auto-Discovery: Universal recursive scanner (handles both CSV & Folder formats)
 Output: /kaggle/working/tier1_include_best.pth & tier1_metrics.json
 =============================================================================
 """
@@ -15,6 +14,8 @@ import json
 import os
 import sys
 import time
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 import torch
@@ -31,103 +32,170 @@ print(f"CUDA Available: {torch.cuda.is_available()}")
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
-    print(f"✅ GPU DETECTED: {torch.cuda.get_device_name(0)}")
-    print(f"   Total VRAM: {torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB")
+    device_name = torch.cuda.get_device_name(0)
+    vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+    print(f"✅ GPU ACTIVE: {device_name} | VRAM: {vram_gb:.2f} GB")
 else:
     device = torch.device("cpu")
     print("⚠️ WARNING: Running on CPU.")
-    print("   👉 For 10x faster training: Go to Notebook Settings (right panel) -> Accelerator -> select 'GPU T4 x2'!")
 
 OUTPUT_DIR = "/kaggle/working"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# ==========================================
-# 1. Dataset Discovery & Auto-Download
-# ==========================================
-print("\n[Step 1] Locating ISL Dataset...")
+# ===========================================================================
+# 1. Universal Dataset Discovery (Recursive Scanner)
+# ===========================================================================
+print("\n[Step 1] Scanning for ISL Parquet & Metadata Files...")
 
-# Search in /kaggle/input
-DATA_DIR = None
-input_dirs = glob.glob("/kaggle/input/**/train.csv", recursive=True)
-if input_dirs:
-    DATA_DIR = os.path.dirname(input_dirs[0])
-    print(f"✅ Found dataset in /kaggle/input: {DATA_DIR}")
-else:
-    print("Dataset not pre-attached in /kaggle/input. Auto-downloading via kagglehub...")
-    try:
-        import kagglehub
-        download_path = kagglehub.dataset_download("swaptr/indian-sign-language-mediapipe-holistic-landmarks")
-        DATA_DIR = download_path
-        print(f"✅ Auto-downloaded dataset via kagglehub: {DATA_DIR}")
-    except Exception as e:
-        print(f"kagglehub download notice: {e}")
+search_roots = [
+    "/kaggle/input",
+    "/kaggle/input/datasets",
+    "/kaggle/input/datasets/swaptr/indian-sign-language-mediapipe-holistic-landmarks",
+    "/root/.cache/kagglehub/datasets",
+]
 
-# If still not found, search all parquet files in input or root
-if not DATA_DIR or not os.path.exists(os.path.join(DATA_DIR, "train.csv")):
-    all_csvs = glob.glob("**/train.csv", recursive=True)
-    if all_csvs:
-        DATA_DIR = os.path.dirname(all_csvs[0])
-        print(f"Discovered train.csv at: {DATA_DIR}")
-    else:
-        raise FileNotFoundError(
-            "Could not locate train.csv. "
-            "Please click '+ Add Data' in the right sidebar and search 'swaptr/indian-sign-language-mediapipe-holistic-landmarks'!"
-        )
+# If kagglehub was called or needed
+try:
+    import kagglehub
+    kh_path = kagglehub.dataset_download("swaptr/indian-sign-language-mediapipe-holistic-landmarks")
+    if kh_path and os.path.exists(kh_path):
+        search_roots.insert(0, kh_path)
+        print(f"✅ kagglehub root: {kh_path}")
+except Exception as e:
+    print(f"kagglehub notice: {e}")
 
-csv_path = os.path.join(DATA_DIR, "train.csv")
-metadata = pd.read_csv(csv_path)
-print(f"Loaded train.csv with {len(metadata):,} sequence samples.")
+all_parquet_files = []
+all_csv_files = []
 
-signer_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["participant", "signer"])), metadata.columns[1])
-sign_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["sign", "label", "gloss"])), metadata.columns[-1])
-path_col = next((c for c in metadata.columns if any(k in c.lower() for k in ["path", "file", "video", "sequence"])), metadata.columns[0])
+for s_root in search_roots:
+    if os.path.exists(s_root):
+        for root, _, files in os.walk(s_root):
+            for f in files:
+                full_p = os.path.join(root, f)
+                if f.endswith(".parquet"):
+                    all_parquet_files.append(full_p)
+                elif f.endswith(".csv") and ("train" in f.lower() or "meta" in f.lower() or "label" in f.lower()):
+                    all_csv_files.append(full_p)
 
-print(f"Schema Mapping -> Signer: '{signer_col}', Sign Gloss: '{sign_col}', Sequence Path: '{path_col}'")
+# De-duplicate
+all_parquet_files = sorted(list(set(all_parquet_files)))
+all_csv_files = sorted(list(set(all_csv_files)))
 
-unique_signers = sorted(metadata[signer_col].unique())
+print(f"Discovered {len(all_parquet_files):,} Parquet Sequence Files.")
+print(f"Discovered {len(all_csv_files)} Metadata CSV Files.")
+
+# Build Sample Registry: list of (parquet_path, class_name, signer_id)
+samples_registry: List[Tuple[str, str, int]] = []
+
+if all_csv_files:
+    # Try parsing CSV metadata
+    csv_loaded = False
+    for c_file in all_csv_files:
+        try:
+            df_meta = pd.read_csv(c_file)
+            signer_c = next((c for c in df_meta.columns if any(k in c.lower() for k in ["participant", "signer"])), None)
+            sign_c = next((c for c in df_meta.columns if any(k in c.lower() for k in ["sign", "label", "gloss"])), None)
+            path_c = next((c for c in df_meta.columns if any(k in c.lower() for k in ["path", "file", "video", "sequence"])), None)
+
+            if sign_c and path_c:
+                base_d = os.path.dirname(c_file)
+                for _, row in df_meta.iterrows():
+                    r_p = str(row[path_c])
+                    s_name = str(row[sign_c])
+                    sg_id = int(row[signer_c]) if (signer_c and str(row[signer_c]).isdigit()) else 0
+
+                    abs_cand = os.path.join(base_d, r_p)
+                    if os.path.exists(abs_cand):
+                        samples_registry.append((abs_cand, s_name, sg_id))
+                if len(samples_registry) > 0:
+                    print(f"✅ Loaded {len(samples_registry):,} samples from {os.path.basename(c_file)}")
+                    csv_loaded = True
+                    break
+        except Exception:
+            pass
+
+if not samples_registry and all_parquet_files:
+    # Universal Folder-based Classification: <class_folder>/<file>.parquet
+    print("Indexing Parquet files by class folder structure...")
+    for idx, p_file in enumerate(all_parquet_files):
+        parent_dir = os.path.basename(os.path.dirname(p_file))
+        # If parent dir is generic ('train_landmarks', 'versions'), use filename prefix
+        if parent_dir.lower() in ["train_landmarks", "1", "versions", "input", "landmarks"]:
+            c_name = os.path.basename(p_file).split("_")[0]
+        else:
+            c_name = parent_dir
+        
+        # Estimate signer ID from filename if present (e.g. signer3_hello_01.parquet -> 3)
+        signer_id = 0
+        fname = os.path.basename(p_file).lower()
+        if "signer" in fname:
+            try:
+                part = fname.split("signer")[1]
+                digits = "".join([ch for ch in part[:3] if ch.isdigit()])
+                if digits:
+                    signer_id = int(digits)
+            except Exception:
+                signer_id = idx % 15
+        else:
+            signer_id = idx % 15
+
+        samples_registry.append((p_file, c_name, signer_id))
+
+if not samples_registry:
+    raise FileNotFoundError(
+        "No ISL parquet sequence files found after scanning /kaggle/input and kagglehub. "
+        "Please ensure 'swaptr/indian-sign-language-mediapipe-holistic-landmarks' is attached."
+    )
+
+# Build Vocabulary & Signer Disjoint Splits
+unique_classes = sorted(list(set(s[1] for s in samples_registry)))
+num_classes = len(unique_classes)
+class_to_idx = {c: i for i, c in enumerate(unique_classes)}
+
+unique_signers = sorted(list(set(s[2] for s in samples_registry)))
 n_s = len(unique_signers)
-train_signers = set(unique_signers[: max(1, int(n_s * 0.70))])
-val_signers = set(unique_signers[max(1, int(n_s * 0.70)) : max(1, int(n_s * 0.85))])
-test_signers = set(unique_signers[max(1, int(n_s * 0.85)) :])
 
-train_meta = metadata[metadata[signer_col].isin(train_signers)]
-val_meta = metadata[metadata[signer_col].isin(val_signers)]
-test_meta = metadata[metadata[signer_col].isin(test_signers)]
+if n_s >= 3:
+    n_tr = max(1, int(n_s * 0.70))
+    n_va = max(1, int(n_s * 0.15))
+    train_signers = set(unique_signers[:n_tr])
+    val_signers = set(unique_signers[n_tr : n_tr + n_va])
+    test_signers = set(unique_signers[n_tr + n_va :])
 
-classes = sorted(metadata[sign_col].unique())
-num_classes = len(classes)
-class_to_idx = {c: i for i, c in enumerate(classes)}
-print(f"Total Classes: {num_classes} | Disjoint Splits -> Train: {len(train_meta)}, Val: {len(val_meta)}, Test: {len(test_meta)}")
+    train_samples = [s for s in samples_registry if s[2] in train_signers]
+    val_samples = [s for s in samples_registry if s[2] in val_signers]
+    test_samples = [s for s in samples_registry if s[2] in test_signers]
+else:
+    # Index-based split
+    np.random.seed(42)
+    shuffled = np.random.permutation(len(samples_registry)).tolist()
+    n_tr = int(0.70 * len(samples_registry))
+    n_va = int(0.15 * len(samples_registry))
+    train_samples = [samples_registry[i] for i in shuffled[:n_tr]]
+    val_samples = [samples_registry[i] for i in shuffled[n_tr : n_tr + n_va]]
+    test_samples = [samples_registry[i] for i in shuffled[n_tr + n_va :]]
+
+print(f"Total Unique Classes: {num_classes}")
+print(f"Disjoint Dataset Splits -> Train: {len(train_samples):,}, Val: {len(val_samples):,}, Test: {len(test_samples):,}")
 
 
-# ==========================================
+# ===========================================================================
 # 2. Sequence Dataset Loader
-# ==========================================
-class GISLRDataset(Dataset):
-    def __init__(self, meta_df: pd.DataFrame, data_dir: str, class_to_idx: dict[str, int], max_len: int = 150) -> None:
-        self.samples: list[tuple[str, int]] = []
-        self.max_len: int = max_len
-        self.class_to_idx: dict[str, int] = class_to_idx
-
-        for _, row in meta_df.iterrows():
-            rel_p = str(row[path_col])
-            lbl = self.class_to_idx.get(str(row[sign_col]), 0)
-            abs_p = os.path.join(data_dir, rel_p)
-            if not os.path.exists(abs_p):
-                matches = glob.glob(os.path.join(data_dir, "**", os.path.basename(rel_p)), recursive=True)
-                if matches:
-                    abs_p = matches[0]
-                else:
-                    continue
-            self.samples.append((abs_p, lbl))
-        print(f"Loaded {len(self.samples)} valid sequence parquet files.")
+# ===========================================================================
+class ISLSequenceParquetDataset(Dataset):
+    def __init__(self, sample_list: List[Tuple[str, str, int]], class_to_idx: Dict[str, int], max_len: int = 150):
+        self.samples = sample_list
+        self.class_to_idx = class_to_idx
+        self.max_len = max_len
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
-        path, label = self.samples[idx]
-        df = pd.read_parquet(path)
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        p_path, c_name, _ = self.samples[idx]
+        lbl = self.class_to_idx.get(c_name, 0)
+
+        df = pd.read_parquet(p_path)
         if "x" in df.columns and "y" in df.columns and "type" in df.columns:
             try:
                 pivoted = df.pivot(index="frame", columns=["type", "landmark_index"], values=["x", "y"]).fillna(0.0)
@@ -142,25 +210,27 @@ class GISLRDataset(Dataset):
             seq = df[x_cols + y_cols].fillna(0.0).values.astype(np.float32)
 
         T, F = seq.shape
-        if F < 152:
-            seq = np.hstack([seq, np.zeros((T, 152 - F), dtype=np.float32)])
-        elif F > 152:
-            seq = seq[:, :152]
+        target_F = 152
+
+        if F < target_F:
+            seq = np.hstack([seq, np.zeros((T, target_F - F), dtype=np.float32)])
+        elif F > target_F:
+            seq = seq[:, :target_F]
 
         if T > self.max_len:
             start = (T - self.max_len) // 2
             seq = seq[start : start + self.max_len]
         elif T < self.max_len:
-            seq = np.vstack([seq, np.zeros((self.max_len - T, 152), dtype=np.float32)])
+            seq = np.vstack([seq, np.zeros((self.max_len - T, target_F), dtype=np.float32)])
 
-        return torch.tensor(seq, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+        return torch.tensor(seq, dtype=torch.float32), torch.tensor(lbl, dtype=torch.long)
 
 
-# ==========================================
+# ===========================================================================
 # 3. Model Architecture
-# ==========================================
+# ===========================================================================
 class Tier1TemporalCNN(nn.Module):
-    def __init__(self, in_features: int = 152, num_classes: int = 263, dropout: float = 0.25) -> None:
+    def __init__(self, in_features: int = 152, num_classes: int = 263, dropout: float = 0.25):
         super().__init__()
         self.conv1 = nn.Conv1d(in_features, 128, 3, padding=1)
         self.bn1 = nn.BatchNorm1d(128)
@@ -180,6 +250,7 @@ class Tier1TemporalCNN(nn.Module):
         self.fc = nn.Linear(256, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (B, T=150, F=152) -> transpose to (B, 152, T)
         x = x.transpose(1, 2)
         x = self.drop1(self.relu1(self.bn1(self.conv1(x))))
         x = self.drop2(self.relu2(self.bn2(self.conv2(x))))
@@ -194,13 +265,13 @@ optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=20)
 scaler = torch.amp.GradScaler("cuda", enabled=torch.cuda.is_available())
 
-train_loader = DataLoader(GISLRDataset(train_meta, DATA_DIR, class_to_idx), batch_size=32, shuffle=True, num_workers=2, pin_memory=True)
-val_loader = DataLoader(GISLRDataset(val_meta, DATA_DIR, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
-test_loader = DataLoader(GISLRDataset(test_meta, DATA_DIR, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
+train_loader = DataLoader(ISLSequenceParquetDataset(train_samples, class_to_idx), batch_size=32, shuffle=True, num_workers=2, pin_memory=True)
+val_loader = DataLoader(ISLSequenceParquetDataset(val_samples, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
+test_loader = DataLoader(ISLSequenceParquetDataset(test_samples, class_to_idx), batch_size=32, shuffle=False, num_workers=2)
 
-# ==========================================
-# 4. Training Loop
-# ==========================================
+# ===========================================================================
+# 4. Multi-Epoch Training Loop
+# ===========================================================================
 EPOCHS = 20
 best_val_acc = 0.0
 t_start = time.time()
@@ -244,21 +315,27 @@ for epoch in range(EPOCHS):
         best_val_acc = val_acc
         save_path = os.path.join(OUTPUT_DIR, "tier1_include_best.pth")
         torch.save({"model_state": model.state_dict(), "class_to_idx": class_to_idx, "num_classes": num_classes}, save_path)
-        print(f"  -> Best Tier-1 model saved to {save_path}")
+        print(f"  -> Best Tier-1 checkpoint saved to {save_path}")
 
 elapsed = time.time() - t_start
-print(f"\nTier-1 Training Complete in {elapsed/60:.2f} minutes (Best Val Acc: {best_val_acc*100:.2f}%).")
+print(f"\n✅ Tier-1 Training Complete in {elapsed/60:.2f} minutes (Best Val Acc: {best_val_acc*100:.2f}%).")
 
-# Save Tier-1 metrics
+# Save Metrics
 metrics = {
     "tier": 1,
     "model_architecture": "Tier1TemporalCNN",
     "classes": num_classes,
+    "train_samples": len(train_samples),
+    "val_samples": len(val_samples),
+    "test_samples": len(test_samples),
     "epochs": EPOCHS,
     "best_val_accuracy": float(best_val_acc),
     "training_time_minutes": round(elapsed / 60, 2),
     "status": "COMPLETE",
 }
+
 with open(os.path.join(OUTPUT_DIR, "tier1_metrics.json"), "w") as f:
     json.dump(metrics, f, indent=2)
+
 print(f"Tier-1 Metrics saved to {OUTPUT_DIR}/tier1_metrics.json")
+print("Execution Complete.")
