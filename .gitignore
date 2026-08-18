@@ -50,5 +50,16 @@ Thumbs.db
 # Docker build cache should be ignored if applicable.
 .docker/
 
+# Data and large media files (never commit videos or datasets)
+data/
+*.mp4
+*.wav
+*.avi
+*.mov
+*.mkv
+*.parquet
+*.npy
+*.npz
+
 # NOTE: Do NOT exclude .agents/ (those are committed)
 !/.agents/
