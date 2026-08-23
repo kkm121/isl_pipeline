@@ -47,64 +47,52 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print("\n" + "=" * 80)
 print("=== Kaggle Input Mount Inspection ===")
 print("=" * 80)
-if os.path.exists("/kaggle/input"):
-    for root, dirs, files in os.walk("/kaggle/input"):
-        depth = root.replace("/kaggle/input", "").count(os.sep)
-        if depth <= 3:
-            print(f"{'  ' * depth}📁 {root} (Dirs: {len(dirs)}, Files: {len(files)})")
-            if len(files) > 0 and depth <= 3:
-                print(f"{'  ' * (depth + 1)}Sample files: {files[:5]}")
-else:
-    print("⚠️ /kaggle/input does not exist!")
-
-# 3. Fast One-Pass WorldStrat File Pair Discovery
-def discover_worldstrat_pairs(base_dir: str = "/kaggle/input") -> list[tuple[str, str]]:
-    """Discovers paired Low-Res (Sentinel-2) and High-Res (SPOT 6/7) imagery in one fast scan."""
-    valid_exts = {".tif", ".tiff", ".TIF", ".TIFF", ".png", ".npz", ".npy"}
-    all_files = []
-    
-    for root, _, files in os.walk(base_dir):
-        # Ignore our source code dataset
-        if "bharatsrm-v4-source" in root:
-            continue
-        for f in files:
-            ext = os.path.splitext(f)[1]
-            if ext in valid_exts:
-                all_files.append(os.path.join(root, f))
-                
-    print(f"\n🔍 Discovered total candidate raster files in {base_dir}: {len(all_files)}")
-    
-    lr_files = []
-    hr_files = []
-    
-    for f in all_files:
-        f_lower = f.lower()
-        if any(k in f_lower for k in ["/lr/", "_lr", "s2", "sentinel", "l2a", "low_res"]):
-            lr_files.append(f)
-        elif any(k in f_lower for k in ["/hr/", "_hr", "spot", "rgbn", "high_res", "pan"]):
-            hr_files.append(f)
-            
-    print(f"  -> Low-Res (Sentinel-2) candidates : {len(lr_files)}")
-    print(f"  -> High-Res (SPOT 6/7) candidates  : {len(hr_files)}")
-    
+# 2. Fast Targeted WorldStrat File Pair Discovery
+def discover_worldstrat_pairs() -> list[tuple[str, str]]:
+    """Discovers matching Low-Res (Sentinel-2) and High-Res (SPOT 6/7) pairs directly by scene ID."""
+    hr_base = "/kaggle/input/worldstrat/hr_dataset/12bit"
+    lr_base = "/kaggle/input/worldstrat/lr_dataset"
     pairs = []
-    # Match by key identifier
-    hr_map = {Path(f).stem.replace("_hr", "").replace("spot_", "").replace("_spot", ""): f for f in hr_files}
-    for lr in lr_files:
-        lr_key = Path(lr).stem.replace("_lr", "").replace("s2_", "").replace("_s2", "")
-        if lr_key in hr_map:
-            pairs.append((lr, hr_map[lr_key]))
+    
+    if os.path.exists(hr_base) and os.path.exists(lr_base):
+        hr_scenes = set(os.listdir(hr_base))
+        lr_scenes = set(os.listdir(lr_base))
+        common_scenes = sorted(list(hr_scenes.intersection(lr_scenes)))
+        print(f"✅ Discovered {len(common_scenes)} common scene folders between HR and LR datasets.")
+        
+        for scene in common_scenes:
+            hr_folder = os.path.join(hr_base, scene)
+            lr_folder = os.path.join(lr_base, scene)
             
-    if len(pairs) == 0 and len(lr_files) > 0 and len(hr_files) > 0:
-        # If naming differs, pair matching folders or positional sort
-        lr_sorted = sorted(lr_files)
-        hr_sorted = sorted(hr_files)
-        pairs = list(zip(lr_sorted, hr_sorted))
-        print(f"  -> Paired {len(pairs)} scenes positionally by sorted paths.")
+            # Find raster files inside scene folders
+            hr_tifs = [os.path.join(hr_folder, f) for f in os.listdir(hr_folder) if f.lower().endswith(('.tif', '.tiff', '.png'))]
+            lr_tifs = [os.path.join(lr_folder, f) for f in os.listdir(lr_folder) if f.lower().endswith(('.tif', '.tiff', '.png'))]
+            
+            if len(hr_tifs) > 0 and len(lr_tifs) > 0:
+                pairs.append((lr_tifs[0], hr_tifs[0]))
+                
+        print(f"✅ Successfully paired {len(pairs)} real WorldStrat Sentinel-2/SPOT 6/7 raster scenes.")
+    else:
+        # Fallback to general scan
+        valid_exts = {".tif", ".tiff", ".TIF", ".TIFF", ".png"}
+        lr_files, hr_files = [], []
+        for root, _, files in os.walk("/kaggle/input"):
+            if "bharatsrm-v4-source" in root:
+                continue
+            for f in files:
+                ext = os.path.splitext(f)[1]
+                if ext in valid_exts:
+                    full_p = os.path.join(root, f)
+                    if "lr_dataset" in full_p or "s2" in full_p.lower():
+                        lr_files.append(full_p)
+                    elif "hr_dataset" in full_p or "spot" in full_p.lower():
+                        hr_files.append(full_p)
+        pairs = list(zip(sorted(lr_files), sorted(hr_files)))
+        print(f"Fallback pairing generated {len(pairs)} pairs.")
         
     return pairs
 
-# 4. Stream Dataset
+# 3. Stream Dataset
 class WorldStratPairedDataset(Dataset):
     def __init__(self, pairs: list[tuple[str, str]], patch_size: int = 64):
         self.pairs = pairs
@@ -128,21 +116,28 @@ class WorldStratPairedDataset(Dataset):
         if np.nanmax(raw_hr) > 1.0:
             raw_hr = np.clip(raw_hr / 10000.0, 0.0, 1.0)
 
-        # Subset 10 Sentinel-2 bands if full 12/13 band stack is loaded
-        # Drop atmospheric bands B1, B9, B10 if 13 bands
+        # Ensure raw_lr is strictly 10 bands
         if raw_lr.shape[0] == 13:
             band_indices = [1, 2, 3, 7, 4, 5, 6, 8, 11, 12]
             raw_lr = raw_lr[band_indices]
         elif raw_lr.shape[0] > 10:
             raw_lr = raw_lr[:10]
         elif raw_lr.shape[0] < 10:
-            # Pad to 10 bands if 4-band LR
-            pad_bands = np.repeat(raw_lr[:1], 10 - raw_lr.shape[0], axis=0)
-            raw_lr = np.concatenate([raw_lr, pad_bands], axis=0)
+            if raw_lr.shape[0] == 1:
+                raw_lr = np.repeat(raw_lr, 10, axis=0)
+            else:
+                pad_bands = np.repeat(raw_lr[:1], 10 - raw_lr.shape[0], axis=0)
+                raw_lr = np.concatenate([raw_lr, pad_bands], axis=0)
 
-        # HR SPOT 6/7 is 4 bands (RGBN)
+        # Ensure raw_hr is strictly 4 bands (RGBN)
         if raw_hr.shape[0] > 4:
             raw_hr = raw_hr[:4]
+        elif raw_hr.shape[0] < 4:
+            if raw_hr.shape[0] == 1:
+                raw_hr = np.repeat(raw_hr, 4, axis=0)  # Expand 1-band Panchromatic to 4-band RGBN
+            else:
+                pad = np.repeat(raw_hr[:1], 4 - raw_hr.shape[0], axis=0)
+                raw_hr = np.concatenate([raw_hr, pad], axis=0)
 
         # Center crop patch
         _, h_lr, w_lr = raw_lr.shape
@@ -174,6 +169,8 @@ class WorldStratPairedDataset(Dataset):
             "context_dem": torch.from_numpy(dem).float(),
         }
 
+
+
 # 5. Discover Dataset & Partition
 all_discovered_pairs = discover_worldstrat_pairs()
 if len(all_discovered_pairs) == 0:
@@ -196,8 +193,8 @@ print(f"Dataset split: {len(train_pairs)} Train pairs | {len(val_pairs)} Validat
 train_dataset = WorldStratPairedDataset(train_pairs, patch_size=64)
 val_dataset = WorldStratPairedDataset(val_pairs, patch_size=64)
 
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, pin_memory=True, drop_last=True if len(train_dataset) > 16 else False)
-val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, pin_memory=True)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True, num_workers=4, drop_last=True if len(train_dataset) > 32 else False)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, pin_memory=True, num_workers=4)
 
 # 6. Model & Loss Setup
 from src.models.bharatsrm_net import BharatSRMNetV4
