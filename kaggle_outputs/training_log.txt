@@ -1,10 +1,10 @@
-Epoch [01/10] | Loss: 0.5886 | Val PSNR: 12.72 dB
-Epoch [02/10] | Loss: 0.5545 | Val PSNR: 12.73 dB
-Epoch [03/10] | Loss: 0.4777 | Val PSNR: 0.00 dB
-Epoch [04/10] | Loss: 0.5626 | Val PSNR: 0.00 dB
-Epoch [05/10] | Loss: 0.5395 | Val PSNR: 0.00 dB
-Epoch [06/10] | Loss: 0.5393 | Val PSNR: 0.00 dB
-Epoch [07/10] | Loss: 0.5317 | Val PSNR: 0.00 dB
-Epoch [08/10] | Loss: 0.5016 | Val PSNR: 0.00 dB
-Epoch [09/10] | Loss: 0.5016 | Val PSNR: 0.00 dB
-Epoch [10/10] | Loss: 0.5316 | Val PSNR: 0.00 dB
+Epoch [01/10] | Loss: 0.2844 [Rec: 0.1473, Spec: 0.2655, Deg: 0.1221, Struct: 0.5580, Conf: -1.2856] | Val PSNR: 18.29 dB
+Epoch [02/10] | Loss: 0.1441 [Rec: 0.0938, Spec: 0.2000, Deg: 0.0587, Struct: 0.4642, Conf: -2.4646] | Val PSNR: 18.50 dB
+Epoch [03/10] | Loss: 0.0788 [Rec: 0.0888, Spec: 0.1962, Deg: 0.0562, Struct: 0.4515, Conf: -2.9603] | Val PSNR: 18.78 dB
+Epoch [04/10] | Loss: 0.0596 [Rec: 0.0892, Spec: 0.1928, Deg: 0.0589, Struct: 0.4498, Conf: -3.3653] | Val PSNR: 18.88 dB
+Epoch [05/10] | Loss: 0.0611 [Rec: 0.0864, Spec: 0.1871, Deg: 0.0572, Struct: 0.4424, Conf: -3.2208] | Val PSNR: 19.04 dB
+Epoch [06/10] | Loss: 0.0500 [Rec: 0.0801, Spec: 0.1806, Deg: 0.0609, Struct: 0.4332, Conf: -3.3034] | Val PSNR: 18.86 dB
+Epoch [07/10] | Loss: 0.0142 [Rec: 0.0733, Spec: 0.1718, Deg: 0.0665, Struct: 0.4252, Conf: -3.8907] | Val PSNR: 18.90 dB
+Epoch [08/10] | Loss: -0.0026 [Rec: 0.0665, Spec: 0.1678, Deg: 0.0723, Struct: 0.4182, Conf: -4.1127] | Val PSNR: 18.92 dB
+Epoch [09/10] | Loss: -0.0148 [Rec: 0.0623, Spec: 0.1617, Deg: 0.0756, Struct: 0.4101, Conf: -4.2623] | Val PSNR: 18.72 dB
+Epoch [10/10] | Loss: -0.0177 [Rec: 0.0612, Spec: 0.1623, Deg: 0.0761, Struct: 0.4076, Conf: -4.2945] | Val PSNR: 18.87 dB
