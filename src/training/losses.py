@@ -48,8 +48,8 @@ class SpectralAngleMapperLoss(nn.Module):
         norm_target = torch.sqrt(torch.sum(target * target, dim=1) + self.eps)
 
         cos_angle = dot / (norm_pred * norm_target)
-        # Clamp to valid acos domain [-1, 1]. The eps in norms already prevents 0/0.
-        cos_angle = torch.clamp(cos_angle, min=-1.0, max=1.0)
+        # Clamp to [-1.0 + eps, 1.0 - eps] to prevent infinite gradients from arccos derivative -1/sqrt(1-x^2) at x=1.0
+        cos_angle = torch.clamp(cos_angle, min=-1.0 + self.eps, max=1.0 - self.eps)
         sam_rad = torch.acos(cos_angle)
         return torch.mean(sam_rad)
 

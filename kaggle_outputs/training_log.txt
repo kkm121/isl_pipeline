@@ -1,0 +1,10 @@
+Epoch [01/10] | Loss: 0.5900 | Val PSNR: 12.73 dB
+Epoch [02/10] | Loss: nan | Val PSNR: nan dB
+Epoch [03/10] | Loss: nan | Val PSNR: nan dB
+Epoch [04/10] | Loss: 0.5701 | Val PSNR: nan dB
+Epoch [05/10] | Loss: nan | Val PSNR: nan dB
+Epoch [06/10] | Loss: nan | Val PSNR: nan dB
+Epoch [07/10] | Loss: nan | Val PSNR: nan dB
+Epoch [08/10] | Loss: nan | Val PSNR: nan dB
+Epoch [09/10] | Loss: nan | Val PSNR: nan dB
+Epoch [10/10] | Loss: nan | Val PSNR: nan dB
