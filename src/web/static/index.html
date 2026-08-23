@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BharatSRM-Net v4 | Satellite Super-Resolution Studio</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <i class="fa-solid fa-satellite-dish brand-icon"></i>
+        <div>
+          <h1>BharatSRM-Net <span>v4</span></h1>
+          <p class="subtitle">Physically-Consistent Super-Resolution for Indian Satellite Imagery (SIH 2026 PS 26142 - NTRO)</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-ntro"><i class="fa-solid fa-shield-halved"></i> NTRO AI Suite</span>
+        <span class="badge badge-res"><i class="fa-solid fa-expand"></i> 10m &rarr; 2.5m (4&times; GSD)</span>
+        <span class="badge badge-bands"><i class="fa-solid fa-layer-group"></i> 4-Band RGBN</span>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+      <!-- Sidebar Controls -->
+      <aside class="sidebar">
+        <!-- AOI Selector -->
+        <div class="control-card">
+          <h3><i class="fa-solid fa-map-location-dot"></i> Indian Area of Interest (AOI)</h3>
+          <select id="aoiSelector" class="form-select">
+            <option value="indo_gangetic">Indo-Gangetic Plains (Punjab/Haryana - Agriculture)</option>
+            <option value="western_ghats">Western Ghats (Canopy & Monsoon Cloud Cover)</option>
+            <option value="peri_urban">Peri-Urban Corridor (Bengaluru - Rapid Built-up)</option>
+            <option value="rajasthan">Semi-Arid Scrubland (Rajasthan - Unpaved Roads)</option>
+          </select>
+          <div id="aoiDescription" class="aoi-meta">Smallholder agriculture, Kharif/Rabi rotation</div>
+        </div>
+
+        <!-- Cloud & Physical Parameters -->
+        <div class="control-card">
+          <h3><i class="fa-solid fa-cloud"></i> Atmospheric & Physical Masking</h3>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span>S2cloudless Threshold:</span>
+              <span id="cloudVal" class="val-badge">40%</span>
+            </div>
+            <input type="range" id="cloudSlider" min="0" max="100" value="40" class="form-slider" />
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="contextDemToggle" checked />
+              <span class="slider round"></span>
+            </label>
+            <span class="toggle-label">Fuse CartoDEM 30m Elevation/Slope (AC-FEM)</span>
+          </div>
+        </div>
+
+        <!-- Layer Toggles -->
+        <div class="control-card">
+          <h3><i class="fa-solid fa-layer-group"></i> Downstream Application Layers</h3>
+          <div class="checkbox-list">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerUncertainty" checked />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-temperature-high"></i> Uncertainty Heatmap (&sigma;&sup2;)</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerRoads" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-road"></i> PMGSY Rural Roads (GeoJSON)</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerLulc" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-tree"></i> LULC & Urban Boundaries</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerChange" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-clock-rotate-left"></i> Bi-Temporal Damage/Change</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <button id="runSrBtn" class="btn-primary">
+          <i class="fa-solid fa-bolt"></i> Run BharatSRM-Net v4
+        </button>
+
+        <!-- Vector Export -->
+        <div class="export-actions">
+          <button class="btn-outline"><i class="fa-solid fa-file-arrow-down"></i> Export GeoTIFF</button>
+          <button class="btn-outline"><i class="fa-solid fa-code"></i> Export GeoJSON</button>
+        </div>
+      </aside>
+
+      <!-- Center Map / Image Split View Slider -->
+      <main class="canvas-area">
+        <div class="canvas-header">
+          <div class="view-indicator">
+            <span class="tag tag-lr"><i class="fa-solid fa-image"></i> Sentinel-2 (10m Native)</span>
+            <span class="divider-icon">&harr;</span>
+            <span class="tag tag-sr"><i class="fa-solid fa-wand-magic-sparkles"></i> BharatSRM-Net v4 (2.5m)</span>
+          </div>
+          <div class="spectral-band-selector">
+            <span class="band-tag active">RGB True Color</span>
+            <span class="band-tag">Color Infrared (NIR-R-G)</span>
+            <span class="band-tag">NDVI Vegetation</span>
+          </div>
+        </div>
+
+        <!-- Before/After Comparison Container -->
+        <div class="comparison-container" id="comparisonSlider">
+          <div class="img-wrapper before-img">
+            <div class="satellite-mock lr-mock">
+              <div class="grid-overlay"></div>
+              <div class="mock-label">Sentinel-2 L2A (10m GSD)</div>
+            </div>
+          </div>
+          <div class="img-wrapper after-img" id="afterWrapper">
+            <div class="satellite-mock hr-mock">
+              <div class="grid-overlay hr-grid"></div>
+              <div id="uncertaintyOverlay" class="uncertainty-overlay active"></div>
+              <div class="mock-label">BharatSRM-Net v4 (2.5m Super-Resolved)</div>
+            </div>
+          </div>
+          <div class="slider-handle" id="sliderHandle">
+            <div class="handle-line"></div>
+            <div class="handle-circle"><i class="fa-solid fa-arrows-left-right"></i></div>
+          </div>
+        </div>
+
+        <!-- Live Quantitative Benchmark Dashboard -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="m-title"><i class="fa-solid fa-signal"></i> PSNR</div>
+            <div class="m-val" id="metricPsnr">34.82 dB</div>
+            <div class="m-sub">Pixel-level fidelity</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title"><i class="fa-solid fa-shapes"></i> SSIM</div>
+            <div class="m-val" id="metricSsim">0.912</div>
+            <div class="m-sub">Structural similarity</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title"><i class="fa-solid fa-compass-drafting"></i> SAM</div>
+            <div class="m-val" id="metricSam">2.14&deg;</div>
+            <div class="m-sub">Spectral angle mapper</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title"><i class="fa-solid fa-cubes"></i> ERGAS</div>
+            <div class="m-val" id="metricErgas">3.45</div>
+            <div class="m-sub">Global synthesis error</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title"><i class="fa-solid fa-rotate"></i> L_degrade</div>
+            <div class="m-val" id="metricDegrade">0.0182</div>
+            <div class="m-sub">MTF/PSF cycle error</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

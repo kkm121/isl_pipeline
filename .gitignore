@@ -1,0 +1,60 @@
+# Python caching & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+venv/
+env/
+
+# Build & Packaging
+build/
+dist/
+*.egg-info/
+
+# Testing & Linters
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs, Checkpoints & Artifacts
+logs/
+checkpoints/
+metrics/
+experiments/
+results/
+.state/
+
+# Model weights & large binaries
+*.pth
+*.pt
+*.onnx
+*.h5
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Geospatial & raw satellite data (Never commit raw rasters)
+/data/
+*.tif
+*.tiff
+*.vrt
+*.nc
+*.hdf
+*.h5
+*.jp2
+*.tar
+*.zip
+*.parquet
+*.npy
+*.npz
+
+# Keep agents and documentation tracked
+!/.agents/
