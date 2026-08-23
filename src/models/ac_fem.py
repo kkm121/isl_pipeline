@@ -77,15 +77,15 @@ class ACFEM(nn.Module):
         # Channel attention weighting vector
         m_channel = self.channel_gate(f_concat_orig)  # (B, C_out, 1, 1)
 
-        # Spatial cross-attention
-        q = self.q_proj(f_spec).view(B, -1, H * W).permute(0, 2, 1)  # (B, HW, C)
-        k = self.k_proj(f_prior).view(B, -1, H * W)  # (B, C, HW)
-        v = self.v_proj(f_prior).view(B, -1, H * W)  # (B, C, HW)
+        # Spatial cross-attention computed in float32 for absolute numerical stability under AMP
+        q = self.q_proj(f_spec).view(B, -1, H * W).permute(0, 2, 1).float()  # (B, HW, C)
+        k = self.k_proj(f_prior).view(B, -1, H * W).float()  # (B, C, HW)
+        v = self.v_proj(f_prior).view(B, -1, H * W).float()  # (B, C, HW)
         
         attn = torch.bmm(q, k) / (q.shape[-1] ** 0.5)
         attn = torch.softmax(attn, dim=-1)
         
-        ca_out = torch.bmm(v, attn.permute(0, 2, 1)).view(B, -1, H, W)
+        ca_out = torch.bmm(v, attn.permute(0, 2, 1)).to(dtype=f_spec.dtype).view(B, -1, H, W)
 
         # Concatenate with cross-attention output
         f_concat = torch.cat([f_spec, f_prior, ca_out], dim=1)

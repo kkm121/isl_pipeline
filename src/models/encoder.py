@@ -91,12 +91,12 @@ class LightweightWindowAttention(nn.Module):
             .reshape(num_win, ws * ws, 3, self.num_heads, c // self.num_heads)
             .permute(2, 0, 3, 1, 4)
         )
-        q, k, v = qkv[0], qkv[1], qkv[2]
+        q, k, v = qkv[0].float(), qkv[1].float(), qkv[2].float()
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
 
-        out_win = (attn @ v).transpose(1, 2).reshape(num_win, ws * ws, c)
+        out_win = (attn @ v).to(dtype=x.dtype).transpose(1, 2).reshape(num_win, ws * ws, c)
         out_win = self.proj(out_win)
 
         # Reverse window partitioning back to full feature tensor
