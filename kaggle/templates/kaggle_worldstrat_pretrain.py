@@ -50,28 +50,60 @@ print("=" * 80)
 # 2. Fast Targeted WorldStrat File Pair Discovery
 def discover_worldstrat_pairs() -> list[tuple[str, str]]:
     """Discovers matching Low-Res (Sentinel-2) and High-Res (SPOT 6/7) pairs directly by scene ID."""
-    hr_base = "/kaggle/input/worldstrat/hr_dataset/12bit"
+    hr_base = "/kaggle/input/worldstrat/hr_dataset"
     lr_base = "/kaggle/input/worldstrat/lr_dataset"
     pairs = []
     
     if os.path.exists(hr_base) and os.path.exists(lr_base):
-        hr_scenes = set(os.listdir(hr_base))
-        lr_scenes = set(os.listdir(lr_base))
-        common_scenes = sorted(list(hr_scenes.intersection(lr_scenes)))
-        print(f"✅ Discovered {len(common_scenes)} common scene folders between HR and LR datasets.")
+        print("Indexing WorldStrat HR and LR datasets...")
+        hr_files = []
+        for root, _, files in os.walk(hr_base):
+            for f in files:
+                if f.lower().endswith(('.tif', '.tiff', '.png', '.npy', '.npz')):
+                    hr_files.append(os.path.join(root, f))
+                    
+        lr_files = []
+        for root, _, files in os.walk(lr_base):
+            for f in files:
+                if f.lower().endswith(('.tif', '.tiff', '.png', '.npy', '.npz')):
+                    lr_files.append(os.path.join(root, f))
+                    
+        print(f"✅ Found {len(hr_files)} High-Resolution files and {len(lr_files)} Low-Resolution files.")
         
-        for scene in common_scenes:
-            hr_folder = os.path.join(hr_base, scene)
-            lr_folder = os.path.join(lr_base, scene)
-            
-            # Find raster files inside scene folders
-            hr_tifs = [os.path.join(hr_folder, f) for f in os.listdir(hr_folder) if f.lower().endswith(('.tif', '.tiff', '.png'))]
-            lr_tifs = [os.path.join(lr_folder, f) for f in os.listdir(lr_folder) if f.lower().endswith(('.tif', '.tiff', '.png'))]
-            
-            if len(hr_tifs) > 0 and len(lr_tifs) > 0:
-                pairs.append((lr_tifs[0], hr_tifs[0]))
+        # Index HR files by scene ID
+        hr_by_scene = {}
+        for p in hr_files:
+            parts = Path(p).parts
+            if "12bit" in parts:
+                idx = parts.index("12bit")
+                if idx + 1 < len(parts):
+                    hr_by_scene[parts[idx + 1]] = p
+            elif "hr_dataset" in parts:
+                idx = parts.index("hr_dataset")
+                if idx + 1 < len(parts):
+                    hr_by_scene[parts[idx + 1]] = p
+
+        # Index LR files by scene ID
+        lr_by_scene = {}
+        for p in lr_files:
+            parts = Path(p).parts
+            if "lr_dataset" in parts:
+                idx = parts.index("lr_dataset")
+                if idx + 1 < len(parts):
+                    scene = parts[idx + 1]
+                    if scene not in lr_by_scene:
+                        lr_by_scene[scene] = p
+
+        for scene, hr_p in hr_by_scene.items():
+            if scene in lr_by_scene:
+                pairs.append((lr_by_scene[scene], hr_p))
                 
-        print(f"✅ Successfully paired {len(pairs)} real WorldStrat Sentinel-2/SPOT 6/7 raster scenes.")
+        print(f"✅ Successfully paired {len(pairs)} real WorldStrat Sentinel-2/SPOT 6/7 scenes by matching scene IDs.")
+        
+        if len(pairs) == 0 and len(hr_files) > 0 and len(lr_files) > 0:
+            # Fallback to sorted positional pairing
+            pairs = list(zip(sorted(lr_files)[:len(hr_files)], sorted(hr_files)))
+            print(f"Positional pairing created {len(pairs)} pairs.")
     else:
         # Fallback to general scan
         valid_exts = {".tif", ".tiff", ".TIF", ".TIFF", ".png"}
