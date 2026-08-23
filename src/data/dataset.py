@@ -45,18 +45,23 @@ class Sentinel2SuperResolutionDataset(Dataset):
 
     @staticmethod
     def _radiometric_normalize(img: np.ndarray) -> np.ndarray:
-        """Applies 1st/99th percentile band-wise normalization to [0.0, 1.0]."""
-        # img: (C, H, W)
-        norm_img = np.zeros_like(img, dtype=np.float32)
-        for c in range(img.shape[0]):
-            band = img[c]
-            p1, p99 = np.percentile(band, 1), np.percentile(band, 99)
-            if p99 > p1:
-                clipped = np.clip(band, p1, p99)
-                norm_img[c] = (clipped - p1) / (p99 - p1 + 1e-8)
-            else:
-                norm_img[c] = np.clip(band, 0.0, 1.0)
-        return norm_img
+        """
+        Converts raw satellite rasters to true physical surface reflectance in [0.0, 1.0].
+        Standard Sentinel-2 L2A / BOA integer reflectance is scaled by 10000.0.
+        Eliminates tile-dependent percentile stretching to preserve MTF degradation consistency.
+        """
+        img = np.nan_to_num(img.astype(np.float32), nan=0.0, posinf=1.0, neginf=0.0)
+        img = np.clip(img, 0.0, None)
+        
+        max_val = float(np.max(img)) if img.size > 0 else 0.0
+        if max_val > 10.0:
+            # Scaled integer BOA reflectance (e.g. 0 - 10000)
+            img = img / 10000.0
+        elif max_val > 1.0:
+            # 12-bit DN range (0 - 4095)
+            img = img / 4095.0
+            
+        return np.clip(img, 0.0, 1.0)
 
     def _apply_augmentations(
         self,

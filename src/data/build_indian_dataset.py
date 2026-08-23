@@ -57,8 +57,8 @@ def extract_overlapping_tiles(
             if lr_tile.shape[1:] != (tile_size, tile_size) or hr_tile.shape[1:] != (hr_tile_size, hr_tile_size):
                 continue
                 
-            # Skip if high nodata/cloud content (simple black/white thresholding)
-            if np.mean(lr_tile) < 0.01 or np.mean(hr_tile) < 0.01:
+            # Explicit nodata checking: ensure at least 70% of the tile has valid non-zero content
+            if np.mean(lr_tile > 0.001) < 0.70 or np.mean(hr_tile > 0.001) < 0.70:
                 continue
                 
             tiles.append((lr_tile, hr_tile, dem_tile))
@@ -132,11 +132,36 @@ def build_gate2_dataset(raw_dir: str, out_dir: str, max_error: float = 1.0):
             with rasterio.open(lr_path) as src_lr, rasterio.open(hr_path) as src_hr:
                 lr_img = src_lr.read().astype(np.float32)  # (C_lr, H, W)
                 hr_img = src_hr.read().astype(np.float32)  # (C_hr, H*4, W*4)
+                lr_dtype = src_lr.dtypes[0] if hasattr(src_lr, 'dtypes') else 'float32'
+                hr_dtype = src_hr.dtypes[0] if hasattr(src_hr, 'dtypes') else 'float32'
+                
+                # Sanitize negative nodata (e.g. -9999) and NaNs
+                lr_img = np.nan_to_num(lr_img, nan=0.0, posinf=1.0, neginf=0.0)
+                hr_img = np.nan_to_num(hr_img, nan=0.0, posinf=1.0, neginf=0.0)
+                lr_img = np.clip(lr_img, 0.0, None)
+                hr_img = np.clip(hr_img, 0.0, None)
+                
+                # Physical surface reflectance scaling to match Gate 1 pretraining
+                if lr_dtype in ['uint16', 'int16', 'uint12'] or np.max(lr_img) > 10.0:
+                    lr_img = lr_img / 10000.0
+                    
+                if hr_dtype in ['uint16', 'int16', 'uint12']:
+                    hr_max = float(np.max(hr_img))
+                    if hr_max > 4095.0:
+                        hr_img = hr_img / 10000.0
+                    elif hr_max > 1.0:
+                        hr_img = hr_img / 4095.0
+                elif np.max(hr_img) > 10.0:
+                    hr_img = hr_img / 10000.0
+                    
+                lr_img = np.clip(lr_img, 0.0, 1.0)
+                hr_img = np.clip(hr_img, 0.0, 1.0)
                 
                 # Optional CartoDEM: Elevation (Band 1), Slope (Band 2)
                 if dem_path.exists():
                     with rasterio.open(dem_path) as src_dem:
                         dem_img = src_dem.read().astype(np.float32)
+                        dem_img = np.nan_to_num(dem_img, nan=0.0, posinf=0.0, neginf=0.0)
                 else:
                     dem_img = None
                 

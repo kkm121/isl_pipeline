@@ -348,7 +348,8 @@ for epoch in range(1, EPOCHS + 1):
             loss = losses["loss_total"]
 
         if torch.isnan(loss) or torch.isinf(loss):
-            print(f"⚠️ Non-finite loss at Epoch {epoch}, Batch {batch_idx}. Skipping.")
+            bad_components = {name: val.item() for name, val in losses.items() if not torch.isfinite(val).item()}
+            print(f"⚠️ Non-finite loss at Epoch {epoch}, Batch {batch_idx}! Offending components: {bad_components}. Skipping.")
             continue
 
         scaler.scale(loss).backward()
