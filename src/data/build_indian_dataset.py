@@ -83,10 +83,15 @@ def harmonize_cross_sensor_spectra(s2_lr: np.ndarray, bhuvan_hr: np.ndarray) -> 
             s2_matched[3] = match_radiometry_histogram(s2_lr[3], bhuvan_hr[2]) # NIR
         return s2_matched, bhuvan_hr
     elif hr_c == 4:
-        # 4-band RGBN matching
+        # 4-band RGBN matching:
+        # HR is Red(0), Green(1), Blue(2), NIR(3)
+        # S2 LR is Blue(0), Green(1), Red(2), NIR(3)
         s2_matched = np.copy(s2_lr)
-        for i in range(min(4, s2_c)):
-            s2_matched[i] = match_radiometry_histogram(s2_lr[i], bhuvan_hr[i])
+        if s2_c >= 4:
+            s2_matched[0] = match_radiometry_histogram(s2_lr[0], bhuvan_hr[2])  # Blue -> Blue
+            s2_matched[1] = match_radiometry_histogram(s2_lr[1], bhuvan_hr[1])  # Green -> Green
+            s2_matched[2] = match_radiometry_histogram(s2_lr[2], bhuvan_hr[0])  # Red -> Red
+            s2_matched[3] = match_radiometry_histogram(s2_lr[3], bhuvan_hr[3])  # NIR -> NIR
         return s2_matched, bhuvan_hr
     else:
         return s2_lr, bhuvan_hr

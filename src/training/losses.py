@@ -193,13 +193,16 @@ class HeteroscedasticUncertaintyLoss(nn.Module):
       L_conf = (1/N) \sum_i [ \exp(-s_i) * ||y_i - \hat{y}_i||^2 + s_i ], where s_i = \log \sigma_i^2.
     """
 
-    def __init__(self):
+    def __init__(self, min_log_var: float = -8.0, max_log_var: float = 5.0):
         super().__init__()
+        self.min_log_var = min_log_var
+        self.max_log_var = max_log_var
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor, log_variance: torch.Tensor) -> torch.Tensor:
         pred = pred.float()
         target = target.float()
-        log_variance = log_variance.float()
+        # Strictly clamp log_variance in FP32 to prevent exp(-s) from overflowing to +inf
+        log_variance = torch.clamp(log_variance.float(), min=self.min_log_var, max=self.max_log_var)
         # diff_sq: (B, 4, H, W)
         diff_sq = (pred - target) ** 2
         # loss = exp(-s) * diff_sq + s
