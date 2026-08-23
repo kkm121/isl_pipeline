@@ -220,13 +220,13 @@ for epoch in range(1, EPOCHS + 1):
             losses = criterion(out["sr_image"], hr, lr, out["log_variance"], epoch=epoch)
             loss = losses["loss_total"]
 
-        scaler.scale(loss).backward()
-        scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        scaler.step(optimizer)
-        scaler.update()
-
-        tot_loss += loss.item() * len(lr)
+        if not torch.isnan(loss) and not torch.isinf(loss):
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            scaler.step(optimizer)
+            scaler.update()
+            tot_loss += loss.item() * len(lr)
 
     scheduler.step()
 
@@ -243,11 +243,14 @@ for epoch in range(1, EPOCHS + 1):
             with torch.amp.autocast("cuda"):
                 out = model(lr, mask, dem)
 
-            m = evaluate_all_metrics(out["sr_image"], hr)
-            val_psnr_list.append(m["PSNR_mean"])
+            m = evaluate_all_metrics(out["sr_image"].float(), hr.float())
+            psnr_val = m["PSNR_mean"]
+            if not np.isnan(psnr_val) and not np.isinf(psnr_val):
+                val_psnr_list.append(psnr_val)
 
-    mean_val_psnr = float(np.mean(val_psnr_list))
-    log_msg = f"Epoch [{epoch:02d}/{EPOCHS:02d}] | Loss: {tot_loss/len(train_dataset):.4f} | Val PSNR: {mean_val_psnr:.2f} dB"
+    mean_val_psnr = float(np.mean(val_psnr_list)) if len(val_psnr_list) > 0 else 0.0
+    avg_train_loss = tot_loss / len(train_dataset) if len(train_dataset) > 0 else 0.0
+    log_msg = f"Epoch [{epoch:02d}/{EPOCHS:02d}] | Loss: {avg_train_loss:.4f} | Val PSNR: {mean_val_psnr:.2f} dB"
     print(log_msg)
     log_file.write(log_msg + "\n")
     log_file.flush()

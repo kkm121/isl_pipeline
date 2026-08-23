@@ -1,0 +1,29 @@
+[{"stream_name":"stdout","time":12.589293723,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":12.589393512000001,"data":"=== BharatSRM-Net v4: WorldStrat RGBN Pretraining Kernel (Dual T4) ===\n"}
+,{"stream_name":"stdout","time":12.589402469,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":13.237038148,"data":"✅ GPU ACTIVE: Tesla T4 | VRAM: 14.56 GB | Count: 2\n"}
+,{"stream_name":"stdout","time":14.513866612,"data":"Using 2 GPUs with DataParallel!\n"}
+,{"stream_name":"stdout","time":404.37612815,"data":"⚠️ WorldStrat COG files not discovered in Kaggle mounts. Using structured synthetic dataset for Gate 1 pilot.\n"}
+,{"stream_name":"stdout","time":631.406815895,"data":"⚠️ WorldStrat COG files not discovered in Kaggle mounts. Using structured synthetic dataset for Gate 1 pilot.\n"}
+,{"stream_name":"stdout","time":631.415011831,"data":"\n"}
+,{"stream_name":"stdout","time":631.415035019,"data":"Model initialized: 885,152 parameters\n"}
+,{"stream_name":"stdout","time":631.415041346,"data":"Starting WorldStrat Pretraining for 10 Epochs...\n"}
+,{"stream_name":"stdout","time":642.062351675,"data":"Epoch [01/10] | Loss: nan | Val PSNR: 12.73 dB\n"}
+,{"stream_name":"stdout","time":647.471641591,"data":"Epoch [02/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":652.862283138,"data":"Epoch [03/10] | Loss: nan | Val PSNR: 12.73 dB\n"}
+,{"stream_name":"stdout","time":658.352789786,"data":"Epoch [04/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":663.819803669,"data":"Epoch [05/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":669.28210425,"data":"Epoch [06/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":674.774437708,"data":"Epoch [07/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":680.172826633,"data":"Epoch [08/10] | Loss: 0.5782 | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":685.70456874,"data":"Epoch [09/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":691.067440731,"data":"Epoch [10/10] | Loss: nan | Val PSNR: nan dB\n"}
+,{"stream_name":"stdout","time":691.067503221,"data":"\n"}
+,{"stream_name":"stdout","time":691.067523535,"data":"Pretraining Complete. Best Val PSNR: 12.73 dB\n"}
+,{"stream_name":"stderr","time":698.207287611,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":698.207399201,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":698.674575185,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":698.674609688,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":699.506020127,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":701.21558683,"data":"[NbConvertApp] Writing 329618 bytes to __results__.html\n"}
+]

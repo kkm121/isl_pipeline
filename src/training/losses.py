@@ -42,13 +42,15 @@ class SpectralAngleMapperLoss(nn.Module):
         self.eps = eps
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-        # pred, target: (B, C=4, H, W)
+        # Cast to float32 for numerical stability under AMP FP16
+        pred = pred.float()
+        target = target.float()
         dot = torch.sum(pred * target, dim=1)  # (B, H, W)
         norm_pred = torch.sqrt(torch.sum(pred * pred, dim=1) + self.eps)
         norm_target = torch.sqrt(torch.sum(target * target, dim=1) + self.eps)
 
-        cos_angle = dot / (norm_pred * norm_target)
-        # Clamp to [-1.0 + eps, 1.0 - eps] to prevent infinite gradients from arccos derivative -1/sqrt(1-x^2) at x=1.0
+        cos_angle = dot / (norm_pred * norm_target + self.eps)
+        # Clamp to [-1.0 + eps, 1.0 - eps] in FP32 to prevent infinite gradients from arccos derivative -1/sqrt(1-x^2) at x=1.0
         cos_angle = torch.clamp(cos_angle, min=-1.0 + self.eps, max=1.0 - self.eps)
         sam_rad = torch.acos(cos_angle)
         return torch.mean(sam_rad)
@@ -58,20 +60,26 @@ class DegradationConsistencyLoss(nn.Module):
     r"""
     Sensor MTF/PSF Degradation Consistency Loss:
     Downsampling the SR reconstruction under a modeled sensor point-spread function
-    must reproduce the observed 10m LR input bands:
-      \hat{x}_LR = Downsample_s( Blur_PSF( \hat{y}_SR ) )
-      L_degrade = || \hat{x}_LR - x_LR ||_1
+    must reconstruct the observed low-resolution input.
     """
 
-    def __init__(self, num_bands: int = 4, scale_factor: int = 4, kernel_size: int = 7, sigma: float = 1.2):
+    def __init__(
+        self,
+        num_bands: int = 4,
+        scale_factor: int = 4,
+        kernel_size: int = 7,
+        psf_sigma: float = 1.2,
+    ):
         super().__init__()
         self.num_bands = num_bands
         self.scale_factor = scale_factor
+        self.kernel_size = kernel_size
+        self.psf_sigma = psf_sigma
 
-        # Construct Gaussian MTF/PSF Blur Kernel
-        coords = torch.arange(kernel_size).float() - (kernel_size - 1) / 2.0
-        g_1d = torch.exp(-(coords**2) / (2.0 * sigma**2))
-        g_2d = g_1d.unsqueeze(1) * g_1d.unsqueeze(0)
+        # Precompute 2D Gaussian PSF kernel for MTF modeling
+        coords = torch.arange(kernel_size, dtype=torch.float32) - (kernel_size - 1) / 2.0
+        g_1d = torch.exp(-(coords**2) / (2 * psf_sigma**2))
+        g_2d = g_1d.unsqueeze(1) @ g_1d.unsqueeze(0)
         g_2d = g_2d / g_2d.sum()
 
         # Reshape to depthwise conv kernel: (num_bands, 1, K, K)
@@ -85,6 +93,9 @@ class DegradationConsistencyLoss(nn.Module):
             sr_image: (B, 4, 4H, 4W) Super-resolved prediction [R, G, B, NIR]
             lr_observed: (B, 4, H, W) or (B, 10, H, W) Observed Sentinel-2 input
         """
+        sr_image = sr_image.float()
+        lr_observed = lr_observed.float()
+
         # If LR has 10 bands [B2(Blue), B3(Green), B4(Red), B8(NIR), ...], extract and order to match SR [R, G, B, NIR]:
         if lr_observed.size(1) >= 10:
             # Index 2 = B4 (Red), Index 1 = B3 (Green), Index 0 = B2 (Blue), Index 3 = B8 (NIR)
@@ -160,6 +171,8 @@ class StructuralSSIMLoss(nn.Module):
         return ssim_map.mean()
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred = pred.float()
+        target = target.float()
         ssim_term = 1.0 - self._ssim(pred, target)
 
         # Sobel edge gradient term
@@ -184,6 +197,9 @@ class HeteroscedasticUncertaintyLoss(nn.Module):
         super().__init__()
 
     def forward(self, pred: torch.Tensor, target: torch.Tensor, log_variance: torch.Tensor) -> torch.Tensor:
+        pred = pred.float()
+        target = target.float()
+        log_variance = log_variance.float()
         # diff_sq: (B, 4, H, W)
         diff_sq = (pred - target) ** 2
         # loss = exp(-s) * diff_sq + s
@@ -214,7 +230,7 @@ class CompositeBharatSRMLoss(nn.Module):
         self.lambda_conf = lambda_conf
 
         self.charbonnier = CharbonnierLoss(eps=1e-3)
-        self.sam = SpectralAngleMapperLoss()
+        self.sam = SpectralAngleMapperLoss(eps=1e-7)
         self.degrade = DegradationConsistencyLoss(num_bands=4, scale_factor=4)
         self.struct = StructuralSSIMLoss(window_size=11, in_channels=4)
         self.conf = HeteroscedasticUncertaintyLoss()
@@ -230,7 +246,13 @@ class CompositeBharatSRMLoss(nn.Module):
     ) -> dict[str, torch.Tensor]:
         """
         Calculates all 5 loss components with loss term warmup for degradation and uncertainty.
+        Enforces float32 full precision to prevent FP16 gradient underflow/overflow.
         """
+        sr_pred = sr_pred.float()
+        hr_target = hr_target.float()
+        lr_input = lr_input.float()
+        log_variance = log_variance.float()
+
         # Loss term warmup factor (0 -> 1 over first warmup_epochs)
         if warmup_epochs <= 0:
             warmup_factor = 1.0
