@@ -95,11 +95,11 @@ class DegradationConsistencyLoss(nn.Module):
             lr_4bands = lr_observed
 
         # Apply sensor PSF blur with reflect padding to prevent dark edge halos
-        # We need to manually pad before conv2d if we want reflect padding with F.conv2d
         padded_sr = F.pad(sr_image, (self.padding, self.padding, self.padding, self.padding), mode='reflect')
+        psf_kernel = self.psf_kernel.to(device=sr_image.device, dtype=sr_image.dtype)
         blurred = F.conv2d(
             padded_sr,
-            self.psf_kernel,
+            psf_kernel,
             padding=0,
             groups=self.num_bands,
         )
@@ -139,17 +139,18 @@ class StructuralSSIMLoss(nn.Module):
 
     def _ssim(self, img1: torch.Tensor, img2: torch.Tensor) -> torch.Tensor:
         padd = self.window_size // 2
-        mu1 = F.conv2d(img1, self.window, padding=padd, groups=self.in_channels)
-        mu2 = F.conv2d(img2, self.window, padding=padd, groups=self.in_channels)
+        window = self.window.to(device=img1.device, dtype=img1.dtype)
+        mu1 = F.conv2d(img1, window, padding=padd, groups=self.in_channels)
+        mu2 = F.conv2d(img2, window, padding=padd, groups=self.in_channels)
 
         mu1_sq = mu1.pow(2)
         mu2_sq = mu2.pow(2)
         mu1_mu2 = mu1 * mu2
 
         # F.relu guards against negative variance from floating-point imprecision
-        sigma1_sq = F.relu(F.conv2d(img1 * img1, self.window, padding=padd, groups=self.in_channels) - mu1_sq)
-        sigma2_sq = F.relu(F.conv2d(img2 * img2, self.window, padding=padd, groups=self.in_channels) - mu2_sq)
-        sigma12 = F.conv2d(img1 * img2, self.window, padding=padd, groups=self.in_channels) - mu1_mu2
+        sigma1_sq = F.relu(F.conv2d(img1 * img1, window, padding=padd, groups=self.in_channels) - mu1_sq)
+        sigma2_sq = F.relu(F.conv2d(img2 * img2, window, padding=padd, groups=self.in_channels) - mu2_sq)
+        sigma12 = F.conv2d(img1 * img2, window, padding=padd, groups=self.in_channels) - mu1_mu2
 
         # Scale constants by data_range (L) per SSIM spec: C1 = (K1*L)^2, C2 = (K2*L)^2
         C1 = (0.01 * self.data_range) ** 2
@@ -162,10 +163,12 @@ class StructuralSSIMLoss(nn.Module):
         ssim_term = 1.0 - self._ssim(pred, target)
 
         # Sobel edge gradient term
-        gx_pred = F.conv2d(pred, self.sobel_x, padding=1, groups=self.in_channels)
-        gy_pred = F.conv2d(pred, self.sobel_y, padding=1, groups=self.in_channels)
-        gx_tgt = F.conv2d(target, self.sobel_x, padding=1, groups=self.in_channels)
-        gy_tgt = F.conv2d(target, self.sobel_y, padding=1, groups=self.in_channels)
+        sobel_x = self.sobel_x.to(device=pred.device, dtype=pred.dtype)
+        sobel_y = self.sobel_y.to(device=pred.device, dtype=pred.dtype)
+        gx_pred = F.conv2d(pred, sobel_x, padding=1, groups=self.in_channels)
+        gy_pred = F.conv2d(pred, sobel_y, padding=1, groups=self.in_channels)
+        gx_tgt = F.conv2d(target, sobel_x, padding=1, groups=self.in_channels)
+        gy_tgt = F.conv2d(target, sobel_y, padding=1, groups=self.in_channels)
 
         edge_loss = F.l1_loss(gx_pred, gx_tgt) + F.l1_loss(gy_pred, gy_tgt)
         return ssim_term + 0.5 * edge_loss

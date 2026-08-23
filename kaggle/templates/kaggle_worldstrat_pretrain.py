@@ -185,7 +185,7 @@ criterion = CompositeBharatSRMLoss(
     lambda_degrade=0.5,
     lambda_struct=0.2,
     lambda_conf=0.05,
-)
+).to(device)
 
 optimizer = optim.AdamW(model.parameters(), lr=2e-4, weight_decay=1e-4)
 EPOCHS = 10
