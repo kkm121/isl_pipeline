@@ -60,6 +60,11 @@ class UncertaintyCalibrationEvaluator:
 
         # Correlation between predicted uncertainty and empirical error
         correlation = float(np.corrcoef(var, actual_sq_error)[0, 1]) if len(var) > 1 else 0.0
+        
+        # Temperature scaling calibration factor
+        mean_var = float(np.mean(var))
+        mean_err = float(np.mean(actual_sq_error))
+        temp_scale = float(mean_err / (mean_var + 1e-8))
 
         return {
             "num_bins": self.num_bins,
@@ -68,4 +73,7 @@ class UncertaintyCalibrationEvaluator:
             "bin_pixel_counts": bin_counts,
             "spread_skill_correlation": correlation,
             "is_monotonic": bool(np.all(np.diff(binned_actual_mse) >= -1e-5)),
+            "temperature_scaling_factor": temp_scale,
+            "calibrated_mean_variance": mean_var * temp_scale,
+            "empirical_mean_mse": mean_err,
         }
