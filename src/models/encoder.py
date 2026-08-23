@@ -29,7 +29,7 @@ class DilatedResidualBlock(nn.Module):
             dilation=dilation,
             bias=False,
         )
-        self.bn1 = nn.BatchNorm2d(channels)
+        self.gn1 = nn.GroupNorm(num_groups=min(8, channels), num_channels=channels)
         self.relu = nn.LeakyReLU(0.2, inplace=True)
         self.conv2 = nn.Conv2d(
             channels,
@@ -39,14 +39,14 @@ class DilatedResidualBlock(nn.Module):
             dilation=dilation,
             bias=False,
         )
-        self.bn2 = nn.BatchNorm2d(channels)
+        self.gn2 = nn.GroupNorm(num_groups=min(8, channels), num_channels=channels)
         self.drop = nn.Dropout2d(dropout) if dropout > 0 else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         res = x
-        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.gn1(self.conv1(x)))
         out = self.drop(out)
-        out = self.bn2(self.conv2(out))
+        out = self.gn2(self.conv2(out))
         return self.relu(out + res)
 
 
@@ -58,93 +58,93 @@ class LightweightWindowAttention(nn.Module):
         self.dim = dim
         self.num_heads = num_heads
         self.window_size = window_size
-        self.head_dim = dim // num_heads
-        self.scale = self.head_dim**-0.5
 
-        self.qkv = nn.Linear(dim, dim * 3, bias=False)
+        self.qkv = nn.Linear(dim, dim * 3)
         self.proj = nn.Linear(dim, dim)
-        self.norm = nn.LayerNorm(dim)
+        self.scale = (dim // num_heads) ** -0.5
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (B, C, H, W)
-        B, C, H, W = x.shape
-        # Pad to multiple of window_size if necessary
-        pad_h = (self.window_size - H % self.window_size) % self.window_size
-        pad_w = (self.window_size - W % self.window_size) % self.window_size
+        b, c, h, w = x.shape
+        ws = self.window_size
+
+        # Pad spatial dimensions to multiple of window_size
+        pad_h = (ws - h % ws) % ws
+        pad_w = (ws - w % ws) % ws
         if pad_h > 0 or pad_w > 0:
-            x = nn.functional.pad(x, (0, pad_w, 0, pad_h))
-            Hp, Wp = H + pad_h, W + pad_w
+            x = F.pad(x, (0, pad_w, 0, pad_h))
+            _, _, hp, wp = x.shape
         else:
-            Hp, Wp = H, W
+            hp, wp = h, w
 
-        # Reshape to windows: (B * num_windows, window_size*window_size, C)
-        x_perm = x.permute(0, 2, 3, 1)  # (B, Hp, Wp, C)
-        x_win = x_perm.reshape(
-            B,
-            Hp // self.window_size,
-            self.window_size,
-            Wp // self.window_size,
-            self.window_size,
-            C,
+        # Reshape to local non-overlapping spatial windows
+        # (B, C, H, W) -> (B * num_windows, window_size * window_size, C)
+        x_windows = (
+            x.view(b, c, hp // ws, ws, wp // ws, ws)
+            .permute(0, 2, 4, 3, 5, 1)
+            .contiguous()
+            .reshape(-1, ws * ws, c)
         )
-        x_win = x_win.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, self.window_size * self.window_size, C)
 
-        # Norm + QKV
-        x_norm = self.norm(x_win)
-        qkv = self.qkv(x_norm).reshape(-1, self.window_size * self.window_size, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        num_win = x_windows.shape[0]
+        qkv = (
+            self.qkv(x_windows)
+            .reshape(num_win, ws * ws, 3, self.num_heads, c // self.num_heads)
+            .permute(2, 0, 3, 1, 4)
+        )
         q, k, v = qkv[0], qkv[1], qkv[2]
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
 
-        out_win = (attn @ v).transpose(1, 2).reshape(-1, self.window_size * self.window_size, C)
+        out_win = (attn @ v).transpose(1, 2).reshape(num_win, ws * ws, c)
         out_win = self.proj(out_win)
 
-        # Restore full shape
-        out = out_win.view(
-            B,
-            Hp // self.window_size,
-            Wp // self.window_size,
-            self.window_size,
-            self.window_size,
-            C,
-        ).permute(0, 5, 1, 3, 2, 4).contiguous().view(B, C, Hp, Wp)
+        # Reverse window partitioning back to full feature tensor
+        out = (
+            out_win.view(b, hp // ws, wp // ws, ws, ws, c)
+            .permute(0, 5, 1, 3, 2, 4)
+            .contiguous()
+            .reshape(b, c, hp, wp)
+        )
 
         if pad_h > 0 or pad_w > 0:
-            out = out[:, :, :H, :W]
+            out = out[:, :, :h, :w]
 
         return out + x
 
 
 class MaskedMultispectralEncoder(nn.Module):
-    """Dual-stage masked multispectral encoder with Partial Convolutions & Dilated Residual blocks."""
+    """
+    Multispectral Encoder combining:
+      1. Gated Partial Convolutions for cloud/shadow masking
+      2. Dilated residual blocks for receptive field expansion (r=1, 2, 4, 8)
+      3. Lightweight Window Attention for spectral cross-band dependencies
+    """
 
     def __init__(
         self,
         in_channels: int = 10,
         base_channels: int = 64,
-        dilation_rates: list[int] | None = None,
+        dilation_rates: tuple[int, ...] = (1, 2, 4, 8),
         use_window_attention: bool = True,
     ):
         super().__init__()
-        if dilation_rates is None:
-            dilation_rates = [1, 2, 4, 8]
-
         self.in_channels = in_channels
         self.base_channels = base_channels
         self.use_window_attention = use_window_attention
 
-        # Step 1: Initial Partial Convolution for cloud/shadow masking
-        self.pconv1 = PartialConv2d(in_channels, base_channels, kernel_size=3, padding=1)
-        self.pconv2 = PartialConv2d(base_channels, base_channels, kernel_size=3, padding=1)
+        # Step 1: Initial PartialConv layers
+        self.pconv1 = PartialConv2d(in_channels, base_channels // 2, kernel_size=3, padding=1)
         self.relu = nn.LeakyReLU(0.2, inplace=True)
+        self.pconv2 = PartialConv2d(base_channels // 2, base_channels, kernel_size=3, padding=1)
 
-        # Step 2: Multi-scale Dilated Residual Blocks (r in {1, 2, 4, 8})
+        # Step 2: Dilated residual blocks (r in {1, 2, 4, 8})
         self.dilated_blocks = nn.ModuleList([
-            DilatedResidualBlock(base_channels, dilation=r) for r in dilation_rates
+            DilatedResidualBlock(base_channels, dilation=r)
+            for r in dilation_rates
         ])
 
-        # Step 3: Optional Window Self-Attention Block
+        # Step 3: Optional local window self-attention
         if use_window_attention:
             self.attn = LightweightWindowAttention(base_channels, num_heads=4, window_size=8)
         else:
@@ -153,7 +153,7 @@ class MaskedMultispectralEncoder(nn.Module):
         # Step 4: Output feature fusion projection
         self.out_proj = nn.Sequential(
             nn.Conv2d(base_channels, base_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(base_channels),
+            nn.GroupNorm(num_groups=min(8, base_channels), num_channels=base_channels),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
@@ -194,13 +194,13 @@ class ContextEncoder(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Conv2d(in_channels, out_channels // 2, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels // 2),
+            nn.GroupNorm(num_groups=min(8, out_channels // 2), num_channels=out_channels // 2),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(out_channels // 2, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=min(8, out_channels), num_channels=out_channels),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=min(8, out_channels), num_channels=out_channels),
             nn.LeakyReLU(0.2, inplace=True),
         )
 

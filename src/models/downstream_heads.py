@@ -22,10 +22,10 @@ class RuralRoadExtractionHead(nn.Module):
         # Takes both high-level backbone features (upsampled) + high-res SR image
         self.net = nn.Sequential(
             nn.Conv2d(in_channels + image_bands, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=8, num_channels=64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
+            nn.GroupNorm(num_groups=8, num_channels=32),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 1, kernel_size=1),
             nn.Sigmoid(),  # Probability map [0, 1]
@@ -47,10 +47,10 @@ class BuiltUpLULCHead(nn.Module):
         self.num_classes = num_classes
         self.net = nn.Sequential(
             nn.Conv2d(in_channels + image_bands, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=8, num_channels=64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=8, num_channels=64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, num_classes, kernel_size=1),
         )
@@ -70,10 +70,10 @@ class ChangeDamageHead(nn.Module):
         in_dim = image_bands + in_channels + (image_bands * 2)
         self.net = nn.Sequential(
             nn.Conv2d(in_dim, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(num_groups=8, num_channels=64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
+            nn.GroupNorm(num_groups=8, num_channels=32),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 1, kernel_size=1),
             nn.Sigmoid(),  # Significant change probability [0, 1]

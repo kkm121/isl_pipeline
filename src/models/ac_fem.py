@@ -42,7 +42,7 @@ class ACFEM(nn.Module):
         # Spatial cross-stream fusion convolution
         self.spatial_fusion = nn.Sequential(
             nn.Conv2d(in_total + out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(num_groups=min(8, out_channels), num_channels=out_channels),
             nn.LeakyReLU(0.2, inplace=True),
         )
 

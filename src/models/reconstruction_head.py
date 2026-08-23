@@ -30,10 +30,10 @@ class ReconstructionHead(nn.Module):
         # Deep refinement layers prior to upscaling
         self.refinement = nn.Sequential(
             nn.Conv2d(in_channels, hidden_dim, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(hidden_dim),
+            nn.GroupNorm(num_groups=min(8, hidden_dim), num_channels=hidden_dim),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(hidden_dim),
+            nn.GroupNorm(num_groups=min(8, hidden_dim), num_channels=hidden_dim),
             nn.LeakyReLU(0.2, inplace=True),
         )
 
