@@ -3,15 +3,34 @@
 BharatSRM-Net v4: Cross-Sensor Registration & Radiometric Harmonization
 =============================================================================
 Section 5.2 Specification:
-  1. Feature-based co-registration: AKAZE keypoint matching + RANSAC homography.
+  1. Feature-based co-registration: Phase correlation / Fourier shift estimation.
   2. Sub-pixel alignment: Rejects tile pairs with residual registration error > 1 LR pixel (~10m).
   3. Radiometric harmonization: Band-wise histogram matching to Sentinel-2 reflectance distribution.
 =============================================================================
 """
 
-
 import numpy as np
-from skimage.exposure import match_histograms
+
+try:
+    from skimage.exposure import match_histograms
+except ImportError:
+
+    def match_histograms(image: np.ndarray, reference: np.ndarray) -> np.ndarray:
+        """Pure NumPy implementation of 2D histogram matching."""
+        orig_shape = image.shape
+        img_flat = image.ravel()
+        ref_flat = reference.ravel()
+
+        s_values, bin_idx, s_counts = np.unique(
+            img_flat, return_inverse=True, return_counts=True
+        )
+        t_values, t_counts = np.unique(ref_flat, return_counts=True)
+
+        s_quantiles = np.cumsum(s_counts).astype(np.float64) / img_flat.size
+        t_quantiles = np.cumsum(t_counts).astype(np.float64) / ref_flat.size
+
+        interp_t_values = np.interp(s_quantiles, t_quantiles, t_values)
+        return interp_t_values[bin_idx].reshape(orig_shape).astype(image.dtype)
 
 
 def match_radiometry_histogram(
