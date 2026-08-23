@@ -142,13 +142,21 @@ class WorldStratPairedDataset(Dataset):
         with rasterio.open(hr_path) as src_hr:
             raw_hr = src_hr.read().astype(np.float32)
 
-        # Reflectance normalization (Sentinel-2 L2A is scaled by 10000)
-        if np.nanmax(raw_lr) > 1.0:
+        # 1. Clean NaNs, Infs, and negative nodata values from raw satellite rasters
+        raw_lr = np.nan_to_num(raw_lr, nan=0.0, posinf=1.0, neginf=0.0)
+        raw_hr = np.nan_to_num(raw_hr, nan=0.0, posinf=1.0, neginf=0.0)
+        raw_lr = np.clip(raw_lr, 0.0, None)
+        raw_hr = np.clip(raw_hr, 0.0, None)
+
+        # 2. Reflectance normalization (Sentinel-2 L2A is scaled by 10000)
+        max_lr = float(np.max(raw_lr)) if raw_lr.size > 0 else 0.0
+        max_hr = float(np.max(raw_hr)) if raw_hr.size > 0 else 0.0
+        if max_lr > 1.0:
             raw_lr = np.clip(raw_lr / 10000.0, 0.0, 1.0)
-        if np.nanmax(raw_hr) > 1.0:
+        if max_hr > 1.0:
             raw_hr = np.clip(raw_hr / 10000.0, 0.0, 1.0)
 
-        # Ensure raw_lr is strictly 10 bands
+        # 3. Ensure raw_lr is strictly 10 bands
         if raw_lr.shape[0] == 13:
             band_indices = [1, 2, 3, 7, 4, 5, 6, 8, 11, 12]
             raw_lr = raw_lr[band_indices]
@@ -161,7 +169,7 @@ class WorldStratPairedDataset(Dataset):
                 pad_bands = np.repeat(raw_lr[:1], 10 - raw_lr.shape[0], axis=0)
                 raw_lr = np.concatenate([raw_lr, pad_bands], axis=0)
 
-        # Ensure raw_hr is strictly 4 bands (RGBN)
+        # 4. Ensure raw_hr is strictly 4 bands (RGBN)
         if raw_hr.shape[0] > 4:
             raw_hr = raw_hr[:4]
         elif raw_hr.shape[0] < 4:
@@ -171,7 +179,7 @@ class WorldStratPairedDataset(Dataset):
                 pad = np.repeat(raw_hr[:1], 4 - raw_hr.shape[0], axis=0)
                 raw_hr = np.concatenate([raw_hr, pad], axis=0)
 
-        # Center crop patch
+        # 5. Center crop patch
         _, h_lr, w_lr = raw_lr.shape
         _, h_hr, w_hr = raw_hr.shape
 
@@ -191,7 +199,12 @@ class WorldStratPairedDataset(Dataset):
             hr_t = torch.from_numpy(raw_hr).unsqueeze(0)
             hr_patch = torch.nn.functional.interpolate(hr_t, size=(self.hr_size, self.hr_size), mode='bilinear').squeeze(0).numpy()
 
+        # Clean patch values once more to ensure 100% finite floats
+        lr_patch = np.nan_to_num(lr_patch, nan=0.0, posinf=1.0, neginf=0.0)
+        hr_patch = np.nan_to_num(hr_patch, nan=0.0, posinf=1.0, neginf=0.0)
+
         mask = (np.mean(lr_patch, axis=0, keepdims=True) > 0.001).astype(np.float32)
+        mask = np.nan_to_num(mask, nan=0.0)
         dem = np.zeros((2, self.patch_size, self.patch_size), dtype=np.float32)
 
         return {
