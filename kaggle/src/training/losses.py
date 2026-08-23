@@ -85,11 +85,8 @@ class DegradationConsistencyLoss(nn.Module):
             sr_image: (B, 4, 4H, 4W) Super-resolved prediction [R, G, B, NIR]
             lr_observed: (B, 4, H, W) or (B, 10, H, W) Observed Sentinel-2 input
         """
-        # If LR has 10 bands [B2(Blue), B3(Green), B4(Red), B8(NIR), ...], extract and order to match SR [R, G, B, NIR]:
-        if lr_observed.size(1) >= 10:
-            # Index 2 = B4 (Red), Index 1 = B3 (Green), Index 0 = B2 (Blue), Index 3 = B8 (NIR)
-            lr_4bands = lr_observed[:, [2, 1, 0, 3], :, :]
-        elif lr_observed.size(1) > self.num_bands:
+        # If LR has 10 bands, extract native 4 bands: [B4(Red), B3(Green), B2(Blue), B8(NIR)]
+        if lr_observed.size(1) > self.num_bands:
             lr_4bands = lr_observed[:, :self.num_bands, :, :]
         else:
             lr_4bands = lr_observed

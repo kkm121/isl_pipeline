@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BharatSRM-Net v4 | Satellite Super-Resolution Studio</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="brand">
+        <i class="fa-solid fa-satellite-dish brand-icon"></i>
+        <div>
+          <h1>BharatSRM-Net <span>v4</span></h1>
+          <p class="subtitle">Physically-Consistent Super-Resolution for Indian Satellite Imagery</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-ntro"><i class="fa-solid fa-shield-halved"></i> NTRO AI Suite</span>
+        <span class="badge badge-res"><i class="fa-solid fa-expand"></i> 10m &rarr; 2.5m (4&times; GSD)</span>
+        <span class="badge badge-bands"><i class="fa-solid fa-layer-group"></i> 4-Band RGBN</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="control-card">
+          <h3><i class="fa-solid fa-map-location-dot"></i> Area of Interest (AOI)</h3>
+          <select id="aoiSelector" class="form-select">
+            <option value="indo_gangetic">Indo-Gangetic Plains</option>
+            <option value="western_ghats">Western Ghats</option>
+            <option value="peri_urban">Peri-Urban Corridor</option>
+            <option value="rajasthan">Semi-Arid Scrubland</option>
+          </select>
+        </div>
+        
+        <div class="control-card">
+          <h3><i class="fa-solid fa-cloud"></i> Atmospheric Masking</h3>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span>S2cloudless Threshold:</span>
+              <span id="cloudVal" class="val-badge">40%</span>
+            </div>
+            <!-- Fix: Cloud slider max is 50 per spec -->
+            <input type="range" id="cloudSlider" min="0" max="50" value="40" class="form-slider" />
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="contextDemToggle" checked />
+              <span class="slider round"></span>
+            </label>
+            <span class="toggle-label">Fuse CartoDEM Elevation</span>
+          </div>
+        </div>
+
+        <div class="control-card">
+          <h3><i class="fa-solid fa-layer-group"></i> Layers & Inputs</h3>
+          <div class="checkbox-list">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerUncertainty" checked />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-temperature-high"></i> Uncertainty Heatmap</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerRoads" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-road"></i> Roads Layer</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerLulc" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-tree"></i> LULC Layer</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="layerChange" />
+              <span class="checkmark"></span>
+              <span><i class="fa-solid fa-clock-rotate-left"></i> Change Layer</span>
+            </label>
+          </div>
+          <div style="margin-top: 10px;">
+             <input type="file" id="imageUpload" accept="image/*" class="form-select" />
+          </div>
+        </div>
+
+        <button id="runSrBtn" class="btn-primary">
+          <i class="fa-solid fa-bolt"></i> Run BharatSRM-Net v4
+        </button>
+      </aside>
+
+      <main class="canvas-area">
+        <div id="map" style="width: 100%; height: 300px; border-radius: 8px; margin-bottom: 16px;"></div>
+
+        <div class="comparison-container" id="comparisonSlider">
+          <div class="img-wrapper before-img">
+            <img id="lrImage" src="" style="width:100%; height:100%; object-fit:cover; display:none;" />
+            <div class="mock-label">LR Input (10m)</div>
+          </div>
+          <div class="img-wrapper after-img" id="afterWrapper">
+            <img id="srImage" src="" style="width:100%; height:100%; object-fit:cover; display:none;" />
+            <img id="uncertaintyOverlay" src="" class="uncertainty-overlay active" />
+            <div class="mock-label">SR Output (2.5m)</div>
+          </div>
+          <div class="slider-handle" id="sliderHandle">
+            <div class="handle-line"></div>
+            <div class="handle-circle"><i class="fa-solid fa-arrows-left-right"></i></div>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="m-title">PSNR</div>
+            <div class="m-val" id="metricPsnr">-- dB</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title">SSIM</div>
+            <div class="m-val" id="metricSsim">--</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title">SAM</div>
+            <div class="m-val" id="metricSam">--&deg;</div>
+          </div>
+          <div class="metric-card">
+            <div class="m-title">ERGAS</div>
+            <div class="m-val" id="metricErgas">--</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

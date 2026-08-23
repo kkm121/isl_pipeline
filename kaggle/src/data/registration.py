@@ -100,23 +100,10 @@ def akaze_keypoint_match(src_gray: np.ndarray, ref_gray: np.ndarray, ratio_thres
     if not HAS_CV2:
         raise ImportError("OpenCV (cv2) is required for AKAZE keypoint matching.")
     
-    def robust_to_uint8(img: np.ndarray) -> np.ndarray:
-        """Converts float/int satellite imagery to uint8 using 2nd/98th percentile contrast stretching."""
-        if img.dtype == np.uint8:
-            return img
-        valid = img[np.isfinite(img)]
-        if valid.size == 0:
-            return np.zeros(img.shape, dtype=np.uint8)
-        p2, p98 = np.percentile(valid, (2.0, 98.0))
-        if p98 <= p2:
-            p2, p98 = float(np.min(valid)), float(np.max(valid))
-        if p98 <= p2:
-            return np.zeros(img.shape, dtype=np.uint8)
-        scaled = np.clip((img - p2) / (p98 - p2 + 1e-6), 0.0, 1.0)
-        return (scaled * 255.0).astype(np.uint8)
-
-    src_gray = robust_to_uint8(src_gray)
-    ref_gray = robust_to_uint8(ref_gray)
+    if src_gray.dtype != np.uint8:
+        src_gray = cv2.normalize(src_gray, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    if ref_gray.dtype != np.uint8:
+        ref_gray = cv2.normalize(ref_gray, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
         
     akaze = cv2.AKAZE_create()
     kp1, des1 = akaze.detectAndCompute(src_gray, None)
@@ -177,59 +164,33 @@ def ransac_homography(src_pts: np.ndarray, ref_pts: np.ndarray, reproj_threshold
     
     return H, mask, rms_error
 
-def register_image_pair(
-    source: np.ndarray, 
-    reference: np.ndarray, 
-    max_error_pixels: float = 1.0,
-    feature_band_idx_src: int | None = None,
-    feature_band_idx_ref: int | None = None,
-) -> tuple[np.ndarray, float, bool]:
-    """
-    Co-registers multi-spectral source image to reference image using AKAZE + RANSAC.
-    Extracts keypoints from the most geometrically salient common band (e.g. Red band).
-    """
+def register_image_pair(source: np.ndarray, reference: np.ndarray, max_error_pixels: float = 1.0) -> tuple[np.ndarray, float, bool]:
     if not HAS_CV2:
         raise ImportError("OpenCV (cv2) is required for image registration.")
         
-    def extract_salient_band(img: np.ndarray, preferred_idx: int | None) -> np.ndarray:
+    def get_gray(img):
         if img.ndim == 2:
             return img
-        # If channel dimension is first (C, H, W)
-        if img.shape[0] in [3, 4, 10, 12, 13]:
-            if preferred_idx is not None and preferred_idx < img.shape[0]:
-                return img[preferred_idx]
-            # Default to Red band index (usually band 2 for 4-band RGBN or band 2/3 for S2)
-            idx = min(2, img.shape[0] - 1)
-            return img[idx]
+        elif img.shape[0] in [3, 4, 10]:
+            return np.mean(img[:3], axis=0)
         else:
-            # (H, W, C)
-            if preferred_idx is not None and preferred_idx < img.shape[-1]:
-                return img[..., preferred_idx]
-            idx = min(2, img.shape[-1] - 1)
-            return img[..., idx]
+            return np.mean(img[..., :3], axis=-1)
 
-    src_gray = extract_salient_band(source, feature_band_idx_src)
-    ref_gray = extract_salient_band(reference, feature_band_idx_ref)
+    src_gray = get_gray(source)
+    ref_gray = get_gray(reference)
     
     src_pts, ref_pts, _ = akaze_keypoint_match(src_gray, ref_gray)
     H, mask, rms_error = ransac_homography(src_pts, ref_pts)
     
     is_valid = rms_error <= max_error_pixels
     
-    # Handle warping for (H, W), (C, H, W), or (H, W, C)
     if source.ndim == 2:
-        ref_h, ref_w = reference.shape[:2]
-        warped = cv2.warpPerspective(source, H, (ref_w, ref_h))
-    elif source.shape[0] in [3, 4, 10, 12, 13]:
-        ref_h = reference.shape[1] if reference.ndim == 3 and reference.shape[0] in [3, 4, 10] else reference.shape[0]
-        ref_w = reference.shape[2] if reference.ndim == 3 and reference.shape[0] in [3, 4, 10] else reference.shape[1]
-        warped = np.zeros((source.shape[0], ref_h, ref_w), dtype=source.dtype)
+        warped = cv2.warpPerspective(source, H, (reference.shape[1], reference.shape[0]))
+    elif source.shape[0] in [3, 4, 10]:
+        warped = np.zeros_like(source)
         for i in range(source.shape[0]):
-            warped[i] = cv2.warpPerspective(source[i], H, (ref_w, ref_h))
+            warped[i] = cv2.warpPerspective(source[i], H, (reference.shape[2], reference.shape[1]))
     else:
-        ref_h, ref_w = reference.shape[:2]
-        warped = np.zeros((ref_h, ref_w, source.shape[-1]), dtype=source.dtype)
-        for i in range(source.shape[-1]):
-            warped[..., i] = cv2.warpPerspective(source[..., i], H, (ref_w, ref_h))
+        warped = cv2.warpPerspective(source, H, (reference.shape[1], reference.shape[0]))
         
     return warped, rms_error, is_valid
