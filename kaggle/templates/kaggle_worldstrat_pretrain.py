@@ -344,10 +344,19 @@ for epoch in range(1, EPOCHS + 1):
         optimizer.zero_grad()
         with torch.amp.autocast("cuda"):
             out = model(lr, mask, dem)
-            losses = criterion(out["sr_image"], hr, lr, out["log_variance"], epoch=epoch)
+            
+        # Compute composite loss in pure FP32 (outside autocast) for zero numerical instability
+        with torch.autocast(device_type="cuda", enabled=False):
+            losses = criterion(
+                out["sr_image"].float(), 
+                hr.float(), 
+                lr.float(), 
+                out["log_variance"].float(), 
+                epoch=epoch
+            )
             loss = losses["loss_total"]
 
-        if torch.isnan(loss) or torch.isinf(loss):
+        if not torch.isfinite(loss):
             bad_components = {name: val.item() for name, val in losses.items() if not torch.isfinite(val).item()}
             print(f"⚠️ Non-finite loss at Epoch {epoch}, Batch {batch_idx}! Offending components: {bad_components}. Skipping.")
             continue

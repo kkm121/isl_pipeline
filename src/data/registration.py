@@ -118,14 +118,25 @@ def akaze_keypoint_match(src_gray: np.ndarray, ref_gray: np.ndarray, ratio_thres
     src_gray = robust_to_uint8(src_gray)
     ref_gray = robust_to_uint8(ref_gray)
         
-    akaze = cv2.AKAZE_create()
-    kp1, des1 = akaze.detectAndCompute(src_gray, None)
-    kp2, des2 = akaze.detectAndCompute(ref_gray, None)
+    if hasattr(cv2, "AKAZE_create"):
+        detector = cv2.AKAZE_create()
+        norm_type = cv2.NORM_HAMMING
+    elif hasattr(cv2, "SIFT_create"):
+        detector = cv2.SIFT_create()
+        norm_type = cv2.NORM_L2
+    elif hasattr(cv2, "ORB_create"):
+        detector = cv2.ORB_create(nfeatures=2000)
+        norm_type = cv2.NORM_HAMMING
+    else:
+        raise AttributeError("No supported feature detector (SIFT/AKAZE/ORB) found in cv2.")
+
+    kp1, des1 = detector.detectAndCompute(src_gray, None)
+    kp2, des2 = detector.detectAndCompute(ref_gray, None)
     
     if des1 is None or des2 is None or len(kp1) < 2 or len(kp2) < 2:
         return np.empty((0, 2), dtype=np.float32), np.empty((0, 2), dtype=np.float32), []
         
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+    bf = cv2.BFMatcher(norm_type)
     matches = bf.knnMatch(des1, des2, k=2)
     
     good_matches = []

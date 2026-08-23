@@ -1,29 +1,231 @@
-[{"stream_name":"stdout","time":11.552735709,"data":"================================================================================\n"}
-,{"stream_name":"stdout","time":11.552804103,"data":"=== BharatSRM-Net v4: WorldStrat RGBN Pretraining Kernel (Dual T4) ===\n"}
-,{"stream_name":"stdout","time":11.552816919,"data":"================================================================================\n"}
-,{"stream_name":"stdout","time":12.18858613,"data":"✅ GPU ACTIVE: Tesla T4 | VRAM: 14.56 GB | Count: 2\n"}
-,{"stream_name":"stdout","time":13.474729915,"data":"Using 2 GPUs with DataParallel!\n"}
-,{"stream_name":"stdout","time":446.050149253,"data":"⚠️ WorldStrat COG files not discovered in Kaggle mounts. Using structured synthetic dataset for Gate 1 pilot.\n"}
-,{"stream_name":"stdout","time":679.399591434,"data":"⚠️ WorldStrat COG files not discovered in Kaggle mounts. Using structured synthetic dataset for Gate 1 pilot.\n"}
-,{"stream_name":"stdout","time":679.407649237,"data":"\n"}
-,{"stream_name":"stdout","time":679.407675288,"data":"Model initialized: 885,152 parameters\n"}
-,{"stream_name":"stdout","time":679.407681801,"data":"Starting WorldStrat Pretraining for 10 Epochs...\n"}
-,{"stream_name":"stdout","time":689.773892567,"data":"Epoch [01/10] | Loss: 0.5886 | Val PSNR: 12.72 dB\n"}
-,{"stream_name":"stdout","time":694.996109738,"data":"Epoch [02/10] | Loss: 0.5545 | Val PSNR: 12.73 dB\n"}
-,{"stream_name":"stdout","time":699.998670195,"data":"Epoch [03/10] | Loss: 0.4777 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":705.306714263,"data":"Epoch [04/10] | Loss: 0.5626 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":710.49758684,"data":"Epoch [05/10] | Loss: 0.5395 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":715.681920407,"data":"Epoch [06/10] | Loss: 0.5393 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":720.741315384,"data":"Epoch [07/10] | Loss: 0.5317 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":725.772204072,"data":"Epoch [08/10] | Loss: 0.5016 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":730.834056362,"data":"Epoch [09/10] | Loss: 0.5016 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":736.124026971,"data":"Epoch [10/10] | Loss: 0.5316 | Val PSNR: 0.00 dB\n"}
-,{"stream_name":"stdout","time":736.124064388,"data":"\n"}
-,{"stream_name":"stdout","time":736.12406955,"data":"Pretraining Complete. Best Val PSNR: 12.73 dB\n"}
-,{"stream_name":"stderr","time":743.260283534,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
-,{"stream_name":"stderr","time":743.260382425,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
-,{"stream_name":"stderr","time":743.699421159,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
-,{"stream_name":"stderr","time":743.699455129,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
-,{"stream_name":"stderr","time":744.565484624,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
-,{"stream_name":"stderr","time":746.22160866,"data":"[NbConvertApp] Writing 331371 bytes to __results__.html\n"}
+[{"stream_name":"stdout","time":6.443876158,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":6.443966648,"data":"=== BharatSRM-Net v4: WorldStrat RGBN Pretraining Kernel (Dual T4) ===\n"}
+,{"stream_name":"stdout","time":6.443971725,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":7.016056906,"data":"✅ GPU ACTIVE: Tesla T4 | VRAM: 14.56 GB | Count: 2\n"}
+,{"stream_name":"stdout","time":7.020435182,"data":"Indexing WorldStrat HR and LR datasets...\n"}
+,{"stream_name":"stdout","time":328.896408226,"data":"✅ Found 15716 High-Resolution candidate files and 170080 Low-Resolution candidate files.\n"}
+,{"stream_name":"stdout","time":329.670953649,"data":"✅ Strictly paired 3928 real WorldStrat Sentinel-2/SPOT 6/7 scenes by matching scene IDs.\n"}
+,{"stream_name":"stdout","time":329.675491987,"data":"\n"}
+,{"stream_name":"stdout","time":329.675521682,"data":"✅ GATE 1 DISCOVERY: Found 3928 matching WorldStrat scene pairs.\n"}
+,{"stream_name":"stdout","time":329.675529337,"data":"Dataset split: 3142 Train pairs | 786 Validation pairs\n"}
+,{"stream_name":"stdout","time":330.499031133,"data":"\n"}
+,{"stream_name":"stdout","time":330.49907326,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":330.499081101,"data":"=== GATE 1 SINGLE-BATCH DIAGNOSTIC (PURE FP32) ===\n"}
+,{"stream_name":"stdout","time":330.499086643,"data":"================================================================================\n"}
+,{"stream_name":"stderr","time":332.34576667,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":332.34582963,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":332.345981944,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":332.345992252,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":332.347512586,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":332.347535707,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":332.353614138,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":332.353640091,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":367.799762486,"data":"Batch LR shape: [32, 10, 64, 64] | Range: [0.0001, 1.0000] | Finite: True\n"}
+,{"stream_name":"stdout","time":367.801115137,"data":"Batch HR shape: [32, 4, 256, 256] | Range: [0.0000, 1.0000] | Finite: True\n"}
+,{"stream_name":"stdout","time":367.801350744,"data":"Batch Mask shape: [32, 1, 64, 64] | Finite: True\n"}
+,{"stream_name":"stdout","time":369.278475787,"data":"\n"}
+,{"stream_name":"stdout","time":369.278532969,"data":"Model Output SR shape: [32, 4, 256, 256] | Range: [0.3868, 0.6581] | Finite: True\n"}
+,{"stream_name":"stdout","time":369.279606293,"data":"Model Output LogVar shape: [32, 4, 256, 256] | Range: [-0.3052, 0.3090] | Finite: True\n"}
+,{"stream_name":"stdout","time":369.590742619,"data":"\n"}
+,{"stream_name":"stdout","time":369.590785887,"data":"📊 INDIVIDUAL LOSS COMPONENT BREAKDOWN (PURE FP32):\n"}
+,{"stream_name":"stdout","time":369.590792924,"data":"  • L_rec (Charbonnier)          : 0.36878 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590797342,"data":"  • L_spec (Spectral Angle Mapper): 0.44112 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590801289,"data":"  • L_degrade (MTF Consistency)  : 0.35073 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590805122,"data":"  • L_struct (SSIM + Sobel Edge) : 0.87017 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590808507,"data":"  • L_conf (Heteroscedastic NLL) : 0.15025 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590811967,"data":"  • TOTAL COMPOSITE LOSS         : 0.64788 (Finite: True)\n"}
+,{"stream_name":"stdout","time":369.590815325,"data":"\n"}
+,{"stream_name":"stdout","time":369.590818615,"data":"✅ GATE 1 MATHEMATICAL \u0026 DATASET DIAGNOSTIC PASSED IN PURE FP32!\n"}
+,{"stream_name":"stdout","time":369.590822497,"data":"================================================================================\n"}
+,{"stream_name":"stdout","time":369.590826131,"data":"\n"}
+,{"stream_name":"stdout","time":369.590829744,"data":"Using 2 GPUs with DataParallel!\n"}
+,{"stream_name":"stdout","time":374.625592885,"data":"Starting WorldStrat Pretraining for 10 Epochs on real data...\n"}
+,{"stream_name":"stderr","time":375.308840065,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":375.308893759,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":375.311458862,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":375.311480485,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":375.323075144,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":375.323092964,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":375.34319102,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":375.34321337,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":448.327876684,"data":"⚠️ Non-finite loss at Epoch 1, Batch 20. Skipping.\n"}
+,{"stream_name":"stderr","time":608.897438752,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":608.89750088,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":608.921973403,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":608.922038888,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":608.933915457,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":608.933947151,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":608.94565201,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":608.945677334,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":679.174754425,"data":"Epoch [01/10] | Loss: 0.2844 [Rec: 0.1473, Spec: 0.2655, Deg: 0.1221, Struct: 0.5580, Conf: -1.2856] | Val PSNR: 18.29 dB\n"}
+,{"stream_name":"stderr","time":679.91948605,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":679.919524787,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":679.924129857,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":679.924222726,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":679.951616548,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":679.951658465,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":679.953958132,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":679.953992003,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":693.43822349,"data":"⚠️ Non-finite loss at Epoch 2, Batch 4. Skipping.\n"}
+,{"stream_name":"stderr","time":873.440506781,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":873.440556152,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":873.442684619,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":873.442711871,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":873.443715894,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":873.443750549,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":873.453005601,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":873.453024449,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":929.19119325,"data":"Epoch [02/10] | Loss: 0.1441 [Rec: 0.0938, Spec: 0.2000, Deg: 0.0587, Struct: 0.4642, Conf: -2.4646] | Val PSNR: 18.50 dB\n"}
+,{"stream_name":"stderr","time":929.717779254,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":929.717846927,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":929.719834831,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":929.719867762,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":929.735161924,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":929.735187774,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":929.746649847,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":929.746676534,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1034.182160734,"data":"⚠️ Non-finite loss at Epoch 3, Batch 49. Skipping.\n"}
+,{"stream_name":"stderr","time":1124.847488819,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1124.847534028,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1124.850997595,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1124.85102659,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1124.884681639,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1124.884715735,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1124.88580729,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1124.885829673,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1179.368691746,"data":"Epoch [03/10] | Loss: 0.0788 [Rec: 0.0888, Spec: 0.1962, Deg: 0.0562, Struct: 0.4515, Conf: -2.9603] | Val PSNR: 18.78 dB\n"}
+,{"stream_name":"stderr","time":1179.887611464,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1179.887649756,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1179.897724719,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1179.897784671,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1179.906340109,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1179.906372896,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1179.908727985,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1179.908769768,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1221.242089644,"data":"⚠️ Non-finite loss at Epoch 4, Batch 18. Skipping.\n"}
+,{"stream_name":"stderr","time":1373.635744944,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1373.635815178,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1373.65782141,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1373.657857499,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1373.658693857,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1373.658726229,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1373.661832142,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1373.661864282,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1428.628125299,"data":"Epoch [04/10] | Loss: 0.0596 [Rec: 0.0892, Spec: 0.1928, Deg: 0.0589, Struct: 0.4498, Conf: -3.3653] | Val PSNR: 18.88 dB\n"}
+,{"stream_name":"stderr","time":1429.189331914,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1429.189396846,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1429.189809036,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1429.189834169,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1429.19100722,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1429.191023287,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1429.193705159,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1429.193725435,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1618.563660524,"data":"⚠️ Non-finite loss at Epoch 5, Batch 93. Skipping.\n"}
+,{"stream_name":"stderr","time":1625.768790657,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1625.768834657,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1625.773647967,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1625.773714113,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1625.794244137,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1625.79437685,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1625.798059333,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1625.798119542,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1679.835643381,"data":"Epoch [05/10] | Loss: 0.0611 [Rec: 0.0864, Spec: 0.1871, Deg: 0.0572, Struct: 0.4424, Conf: -3.2208] | Val PSNR: 19.04 dB\n"}
+,{"stream_name":"stderr","time":1680.362976929,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1680.363044153,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1680.364699271,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1680.364734303,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1680.391027336,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1680.391057466,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1680.393707174,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1680.393769214,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1765.130906609,"data":"⚠️ Non-finite loss at Epoch 6, Batch 39. Skipping.\n"}
+,{"stream_name":"stderr","time":1876.421851685,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1876.421898095,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1876.427066519,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1876.427143633,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1876.446019129,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1876.44604352,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1876.463720644,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1876.46375157,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":1930.527828189,"data":"Epoch [06/10] | Loss: 0.0500 [Rec: 0.0801, Spec: 0.1806, Deg: 0.0609, Struct: 0.4332, Conf: -3.3034] | Val PSNR: 18.86 dB\n"}
+,{"stream_name":"stderr","time":1931.102181103,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1931.102221463,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1931.115332249,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1931.115366653,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1931.115771987,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1931.11579584,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":1931.120102484,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":1931.120120893,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2081.401905678,"data":"⚠️ Non-finite loss at Epoch 7, Batch 72. Skipping.\n"}
+,{"stream_name":"stderr","time":2128.136913323,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2128.136955221,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2128.139692824,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2128.139717142,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2128.172109678,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2128.172142251,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2128.179782333,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2128.179900196,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2183.955447236,"data":"Epoch [07/10] | Loss: 0.0142 [Rec: 0.0733, Spec: 0.1718, Deg: 0.0665, Struct: 0.4252, Conf: -3.8907] | Val PSNR: 18.90 dB\n"}
+,{"stream_name":"stderr","time":2184.464744489,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2184.464808066,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2184.468223076,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2184.468251448,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2184.487506514,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2184.487588667,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2184.494721715,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2184.494753719,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2270.562936092,"data":"⚠️ Non-finite loss at Epoch 8, Batch 41. Skipping.\n"}
+,{"stream_name":"stderr","time":2379.333491904,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2379.333597626,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2379.348328163,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2379.348357017,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2379.351712541,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2379.351734398,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2379.357641069,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2379.357667407,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2435.018772586,"data":"Epoch [08/10] | Loss: -0.0026 [Rec: 0.0665, Spec: 0.1678, Deg: 0.0723, Struct: 0.4182, Conf: -4.1127] | Val PSNR: 18.92 dB\n"}
+,{"stream_name":"stderr","time":2435.819597599,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2435.819639652,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2435.823295769,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2435.823353471,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2435.823708186,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2435.823726223,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2435.831969316,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2435.831989434,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2500.723235737,"data":"⚠️ Non-finite loss at Epoch 9, Batch 27. Skipping.\n"}
+,{"stream_name":"stderr","time":2640.268986401,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2640.269036375,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2640.274762158,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2640.274813473,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2640.311044845,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2640.31107903,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2640.320768807,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2640.320796399,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2695.975399908,"data":"Epoch [09/10] | Loss: -0.0148 [Rec: 0.0623, Spec: 0.1617, Deg: 0.0756, Struct: 0.4101, Conf: -4.2623] | Val PSNR: 18.72 dB\n"}
+,{"stream_name":"stderr","time":2696.743959216,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2696.743997525,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2696.746671846,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2696.746743608,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2696.75826396,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2696.758290251,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2696.777742658,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2696.778639705,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2891.996715391,"data":"⚠️ Non-finite loss at Epoch 10, Batch 95. Skipping.\n"}
+,{"stream_name":"stderr","time":2897.121141584,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2897.121425068,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2897.124261001,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2897.124282358,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2897.137702542,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2897.137731808,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stderr","time":2897.137737168,"data":"/usr/local/lib/python3.12/dist-packages/rasterio/__init__.py:367: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.\n"}
+,{"stream_name":"stderr","time":2897.137741029,"data":"  dataset = DatasetReader(path, driver=driver, sharing=sharing, thread_safe=thread_safe, **kwargs)\n"}
+,{"stream_name":"stdout","time":2951.778967057,"data":"Epoch [10/10] | Loss: -0.0177 [Rec: 0.0612, Spec: 0.1623, Deg: 0.0761, Struct: 0.4076, Conf: -4.2945] | Val PSNR: 18.87 dB\n"}
+,{"stream_name":"stdout","time":2951.779012457,"data":"\n"}
+,{"stream_name":"stdout","time":2951.779019196,"data":"Pretraining Complete. Best Val PSNR: 19.04 dB\n"}
+,{"stream_name":"stderr","time":2957.13663823,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2957.136672628,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2957.432744208,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2957.432779014,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2958.115355873,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2959.469208786,"data":"[NbConvertApp] Writing 367901 bytes to __results__.html\n"}
 ]

@@ -96,13 +96,13 @@ def harmonize_cross_sensor_spectra(s2_lr: np.ndarray, bhuvan_hr: np.ndarray) -> 
     else:
         return s2_lr, bhuvan_hr
 
-def build_gate2_dataset(raw_dir: str, out_dir: str, max_error: float = 1.0):
+def build_gate2_dataset(raw_dir: str, out_dir: str, max_error: float = 1.0, tile_size: int = 64):
     """
     Assembles the Gate 2 Indian Dataset.
     Expects raw_dir to have subfolders for each AOI containing Sentinel-2 (LR) and Bhuvan (HR) GeoTIFFs.
     """
     print(f"=== BharatSRM-Net v4: Gate 2 Indian Dataset Assembly ===")
-    print(f"Aligning Sentinel-2 & Bhuvan pairs using AKAZE/RANSAC and wavelength-aware harmonization...")
+    print(f"Aligning Sentinel-2 & Bhuvan pairs using SIFT/AKAZE/RANSAC and wavelength-aware harmonization...")
     
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -168,7 +168,7 @@ def build_gate2_dataset(raw_dir: str, out_dir: str, max_error: float = 1.0):
                 # Safe multi-band scaling to HR dimension for AKAZE feature extraction
                 lr_scaled = resize_multiband(lr_img, hr_img.shape[1], hr_img.shape[2], mode="bilinear")
                 
-                # Run AKAZE + RANSAC registration using Red band for geometric saliency
+                # Run SIFT/AKAZE + RANSAC registration using Red band for geometric saliency
                 try:
                     warped_lr, rms_error, is_valid = register_image_pair(
                         source=lr_scaled, 
@@ -193,8 +193,8 @@ def build_gate2_dataset(raw_dir: str, out_dir: str, max_error: float = 1.0):
                 # Spectral radiometry harmonization
                 final_lr_matched, hr_final = harmonize_cross_sensor_spectra(final_lr, hr_img)
                 
-                # Extract 256x256 tiles
-                tiles = extract_overlapping_tiles(final_lr_matched, hr_final, dem_img=dem_img, tile_size=256, scale=4)
+                # Extract 64x64 LR (256x256 HR) tiles
+                tiles = extract_overlapping_tiles(final_lr_matched, hr_final, dem_img=dem_img, tile_size=tile_size, scale=4)
                 
                 for idx, (t_lr, t_hr, t_dem) in enumerate(tiles):
                     np.savez_compressed(
