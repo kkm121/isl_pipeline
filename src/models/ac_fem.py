@@ -34,9 +34,14 @@ class ACFEM(nn.Module):
             nn.Sigmoid(),
         )
 
+        # Spatial cross-attention
+        self.q_proj = nn.Conv2d(spec_channels, out_channels, kernel_size=1)
+        self.k_proj = nn.Conv2d(prior_channels, out_channels, kernel_size=1)
+        self.v_proj = nn.Conv2d(prior_channels, out_channels, kernel_size=1)
+
         # Spatial cross-stream fusion convolution
         self.spatial_fusion = nn.Sequential(
-            nn.Conv2d(in_total, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.Conv2d(in_total + out_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(0.2, inplace=True),
         )
@@ -64,11 +69,26 @@ class ACFEM(nn.Module):
         Returns:
             f_fused: Fused feature representation of shape (B, C_out, H, W)
         """
+        B, C_spec, H, W = f_spec.shape
+
         # Concatenate spectral evidence and context prior
-        f_concat = torch.cat([f_spec, f_prior], dim=1)
+        f_concat_orig = torch.cat([f_spec, f_prior], dim=1)
 
         # Channel attention weighting vector
-        m_channel = self.channel_gate(f_concat)  # (B, C_out, 1, 1)
+        m_channel = self.channel_gate(f_concat_orig)  # (B, C_out, 1, 1)
+
+        # Spatial cross-attention
+        q = self.q_proj(f_spec).view(B, -1, H * W).permute(0, 2, 1)  # (B, HW, C)
+        k = self.k_proj(f_prior).view(B, -1, H * W)  # (B, C, HW)
+        v = self.v_proj(f_prior).view(B, -1, H * W)  # (B, C, HW)
+        
+        attn = torch.bmm(q, k) / (q.shape[-1] ** 0.5)
+        attn = torch.softmax(attn, dim=-1)
+        
+        ca_out = torch.bmm(v, attn.permute(0, 2, 1)).view(B, -1, H, W)
+
+        # Concatenate with cross-attention output
+        f_concat = torch.cat([f_spec, f_prior, ca_out], dim=1)
 
         # Convolved fusion features
         f_conv = self.spatial_fusion(f_concat)   # (B, C_out, H, W)

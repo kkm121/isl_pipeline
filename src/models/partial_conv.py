@@ -105,11 +105,8 @@ class PartialConv2d(nn.Module):
             new_mask = (mask_sum > 0).to(dtype=x.dtype)
             mask_ratio = mask_ratio * new_mask
 
-        # Masked input features: X \odot M
-        if mask.size(1) == 1 and x.size(1) > 1:
-            masked_x = x * mask
-        else:
-            masked_x = x * mask
+        # Masked input features: X \odot M (broadcasting handles single-channel mask)
+        masked_x = x * mask
 
         # Standard convolution over masked features
         raw_out = F.conv2d(

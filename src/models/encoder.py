@@ -79,7 +79,7 @@ class LightweightWindowAttention(nn.Module):
 
         # Reshape to windows: (B * num_windows, window_size*window_size, C)
         x_perm = x.permute(0, 2, 3, 1)  # (B, Hp, Wp, C)
-        x_win = x_perm.view(
+        x_win = x_perm.reshape(
             B,
             Hp // self.window_size,
             self.window_size,

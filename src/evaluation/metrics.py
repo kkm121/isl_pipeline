@@ -157,6 +157,74 @@ def calculate_rmse(
     return res
 
 
+def _create_window(window_size: int, channel: int) -> torch.Tensor:
+    import math
+    gauss = torch.tensor([math.exp(-(x - window_size // 2) ** 2 / float(2 * 1.5 ** 2)) for x in range(window_size)])
+    gauss = gauss / gauss.sum()
+    _1D_window = gauss.unsqueeze(1)
+    _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+    return _2D_window.expand(channel, 1, window_size, window_size).contiguous()
+
+def calculate_ssim(
+    pred: torch.Tensor | np.ndarray,
+    target: torch.Tensor | np.ndarray,
+    data_range: float = 1.0,
+    window_size: int = 11,
+) -> dict[str, float]:
+    """Computes SSIM per band and mean SSIM using sliding window Gaussian convolution."""
+    if isinstance(pred, np.ndarray):
+        pred = torch.from_numpy(pred).float()
+    else:
+        pred = pred.float()
+        
+    if isinstance(target, np.ndarray):
+        target = torch.from_numpy(target).float()
+    else:
+        target = target.float()
+
+    if pred.ndim == 3:
+        pred = pred.unsqueeze(0)
+        target = target.unsqueeze(0)
+        
+    device = pred.device
+    _, C, H, W = pred.shape
+    
+    if min(H, W) < window_size:
+        window_size = min(H, W)
+        if window_size % 2 == 0:
+            window_size -= 1
+            
+    window = _create_window(window_size, C).to(device)
+    import torch.nn.functional as F
+    
+    mu1 = F.conv2d(pred, window, padding=0, groups=C)
+    mu2 = F.conv2d(target, window, padding=0, groups=C)
+    
+    mu1_sq = mu1.pow(2)
+    mu2_sq = mu2.pow(2)
+    mu1_mu2 = mu1 * mu2
+    
+    sigma1_sq = F.conv2d(pred * pred, window, padding=0, groups=C) - mu1_sq
+    sigma2_sq = F.conv2d(target * target, window, padding=0, groups=C) - mu2_sq
+    sigma12 = F.conv2d(pred * target, window, padding=0, groups=C) - mu1_mu2
+    
+    C1 = (0.01 * data_range) ** 2
+    C2 = (0.03 * data_range) ** 2
+    
+    ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
+    
+    band_names = ["Red", "Green", "Blue", "NIR"][:C]
+    res = {}
+    ssim_vals = []
+    
+    for c in range(C):
+        ssim_c = float(ssim_map[:, c, :, :].mean().item())
+        res[f"SSIM_{band_names[c] if c < len(band_names) else f'B{c}'}"] = ssim_c
+        ssim_vals.append(ssim_c)
+        
+    res["SSIM_mean"] = float(np.mean(ssim_vals))
+    return res
+
 def evaluate_all_metrics(
     pred: torch.Tensor,
     target: torch.Tensor,
@@ -168,6 +236,10 @@ def evaluate_all_metrics(
     # PSNR
     psnr_dict = calculate_psnr(pred, target)
     metrics.update(psnr_dict)
+
+    # SSIM
+    ssim_dict = calculate_ssim(pred, target)
+    metrics.update(ssim_dict)
 
     # SAM (Spectral Angle Mapper)
     metrics["SAM_deg"] = calculate_sam(pred, target)

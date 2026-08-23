@@ -22,7 +22,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.evaluation.metrics import calculate_psnr, calculate_sam
+from src.evaluation.metrics import calculate_psnr, calculate_sam, calculate_ssim
 
 
 class GaussianPSFKernel(nn.Module):
@@ -333,8 +333,10 @@ class KernelSensitivityEvaluator:
             if hr_target is not None:
                 psnr_dict = calculate_psnr(sr_pred, hr_target)
                 sam_val = calculate_sam(sr_pred, hr_target)
+                ssim_dict = calculate_ssim(sr_pred, hr_target)
                 kernel_dict["PSNR_mean"] = psnr_dict["PSNR_mean"]
                 kernel_dict["SAM_deg"] = sam_val
+                kernel_dict["SSIM_mean"] = ssim_dict["SSIM_mean"]
 
             per_kernel_metrics[name] = kernel_dict
 

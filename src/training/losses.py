@@ -47,8 +47,9 @@ class SpectralAngleMapperLoss(nn.Module):
         norm_pred = torch.sqrt(torch.sum(pred * pred, dim=1) + self.eps)
         norm_target = torch.sqrt(torch.sum(target * target, dim=1) + self.eps)
 
-        cos_angle = dot / (norm_pred * norm_target + self.eps)
-        cos_angle = torch.clamp(cos_angle, min=-1.0 + self.eps, max=1.0 - self.eps)
+        cos_angle = dot / (norm_pred * norm_target)
+        # Clamp to valid acos domain [-1, 1]. The eps in norms already prevents 0/0.
+        cos_angle = torch.clamp(cos_angle, min=-1.0, max=1.0)
         sam_rad = torch.acos(cos_angle)
         return torch.mean(sam_rad)
 
@@ -90,11 +91,13 @@ class DegradationConsistencyLoss(nn.Module):
         else:
             lr_4bands = lr_observed
 
-        # Apply sensor PSF blur
+        # Apply sensor PSF blur with reflect padding to prevent dark edge halos
+        # We need to manually pad before conv2d if we want reflect padding with F.conv2d
+        padded_sr = F.pad(sr_image, (self.padding, self.padding, self.padding, self.padding), mode='reflect')
         blurred = F.conv2d(
-            sr_image,
+            padded_sr,
             self.psf_kernel,
-            padding=self.padding,
+            padding=0,
             groups=self.num_bands,
         )
 
@@ -111,10 +114,11 @@ class DegradationConsistencyLoss(nn.Module):
 class StructuralSSIMLoss(nn.Module):
     """Structural Similarity (SSIM) + Sobel Gradient Edge Preservation Loss."""
 
-    def __init__(self, window_size: int = 11, in_channels: int = 4):
+    def __init__(self, window_size: int = 11, in_channels: int = 4, data_range: float = 1.0):
         super().__init__()
         self.window_size = window_size
         self.in_channels = in_channels
+        self.data_range = data_range
 
         # 1D Gaussian kernel for SSIM window
         sigma = 1.5
@@ -139,12 +143,14 @@ class StructuralSSIMLoss(nn.Module):
         mu2_sq = mu2.pow(2)
         mu1_mu2 = mu1 * mu2
 
-        sigma1_sq = F.conv2d(img1 * img1, self.window, padding=padd, groups=self.in_channels) - mu1_sq
-        sigma2_sq = F.conv2d(img2 * img2, self.window, padding=padd, groups=self.in_channels) - mu2_sq
+        # F.relu guards against negative variance from floating-point imprecision
+        sigma1_sq = F.relu(F.conv2d(img1 * img1, self.window, padding=padd, groups=self.in_channels) - mu1_sq)
+        sigma2_sq = F.relu(F.conv2d(img2 * img2, self.window, padding=padd, groups=self.in_channels) - mu2_sq)
         sigma12 = F.conv2d(img1 * img2, self.window, padding=padd, groups=self.in_channels) - mu1_mu2
 
-        C1 = 0.01 ** 2
-        C2 = 0.03 ** 2
+        # Scale constants by data_range (L) per SSIM spec: C1 = (K1*L)^2, C2 = (K2*L)^2
+        C1 = (0.01 * self.data_range) ** 2
+        C2 = (0.03 * self.data_range) ** 2
 
         ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigma12 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
         return ssim_map.mean()
@@ -219,8 +225,10 @@ class CompositeBharatSRMLoss(nn.Module):
         """
         Calculates all 5 loss components with loss term warmup for degradation and uncertainty.
         """
-        # Loss term warmup factor (0 -> 1 over first 3 epochs)
-        if epoch <= warmup_epochs:
+        # Loss term warmup factor (0 -> 1 over first warmup_epochs)
+        if warmup_epochs <= 0:
+            warmup_factor = 1.0
+        elif epoch <= warmup_epochs:
             warmup_factor = float(epoch) / float(warmup_epochs)
         else:
             warmup_factor = 1.0
@@ -249,3 +257,5 @@ class CompositeBharatSRMLoss(nn.Module):
             "loss_conf": l_conf,
             "warmup_factor": torch.tensor(warmup_factor),
         }
+
+SSIMLoss = StructuralSSIMLoss

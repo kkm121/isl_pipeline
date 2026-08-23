@@ -57,3 +57,94 @@ def export_to_onnx(
         },
     )
     return output_path
+
+
+def quantize_pytorch_dynamic(model: torch.nn.Module) -> torch.nn.Module:
+    """Uses torch.quantization.quantize_dynamic() for INT8 dynamic quantization of Conv2d and Linear layers."""
+    model.eval()
+    quantized_model = torch.quantization.quantize_dynamic(
+        model, 
+        {torch.nn.Conv2d, torch.nn.Linear}, 
+        dtype=torch.qint8
+    )
+    return quantized_model
+
+
+def quantize_onnx_dynamic(input_onnx_path: str, output_onnx_path: str) -> str:
+    """Uses onnxruntime.quantization.quantize_dynamic() for ONNX INT8 quantization."""
+    from onnxruntime.quantization import quantize_dynamic, QuantType
+    quantize_dynamic(
+        input_onnx_path,
+        output_onnx_path,
+        weight_type=QuantType.QUInt8,
+    )
+    return output_onnx_path
+
+
+def benchmark_quantization(
+    fp32_model: torch.nn.Module,
+    int8_model: torch.nn.Module,
+    test_input: tuple[torch.Tensor, ...],
+    target: torch.Tensor,
+) -> dict[str, float]:
+    """Compares FP32 vs INT8 model size, latency per tile, and PSNR degradation after quantization."""
+    import tempfile
+    import time
+    from src.evaluation.metrics import calculate_psnr
+    
+    # Model size
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        torch.save(fp32_model.state_dict(), f.name)
+        fp32_size = os.path.getsize(f.name) / (1024 * 1024)
+    os.remove(f.name)
+        
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        torch.save(int8_model.state_dict(), f.name)
+        int8_size = os.path.getsize(f.name) / (1024 * 1024)
+    os.remove(f.name)
+        
+    # Latency
+    fp32_model.eval()
+    int8_model.eval()
+    
+    # Warmup
+    with torch.no_grad():
+        for _ in range(2):
+            fp32_model(*test_input)
+            int8_model(*test_input)
+            
+    # Measure FP32
+    start = time.perf_counter()
+    with torch.no_grad():
+        for _ in range(5):
+            fp32_out = fp32_model(*test_input)
+    fp32_latency = (time.perf_counter() - start) / 5.0
+    
+    # Measure INT8
+    start = time.perf_counter()
+    with torch.no_grad():
+        for _ in range(5):
+            int8_out = int8_model(*test_input)
+    int8_latency = (time.perf_counter() - start) / 5.0
+    
+    if isinstance(fp32_out, dict):
+        fp32_pred = fp32_out["sr_image"]
+        int8_pred = int8_out["sr_image"]
+    else:
+        fp32_pred = fp32_out
+        int8_pred = int8_out
+        
+    fp32_psnr = calculate_psnr(fp32_pred, target)["PSNR_mean"]
+    int8_psnr = calculate_psnr(int8_pred, target)["PSNR_mean"]
+    
+    return {
+        "fp32_size_mb": fp32_size,
+        "int8_size_mb": int8_size,
+        "size_reduction_factor": fp32_size / int8_size if int8_size > 0 else 0,
+        "fp32_latency_s": fp32_latency,
+        "int8_latency_s": int8_latency,
+        "speedup": fp32_latency / int8_latency if int8_latency > 0 else 0,
+        "fp32_psnr": fp32_psnr,
+        "int8_psnr": int8_psnr,
+        "psnr_degradation": fp32_psnr - int8_psnr
+    }

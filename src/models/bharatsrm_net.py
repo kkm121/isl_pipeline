@@ -131,7 +131,13 @@ class BharatSRMNetV4(nn.Module):
         # Step 2: Context fusion via AC-FEM if context stream is active
         if self.use_context_stream and self.context_encoder is not None and self.ac_fem is not None:
             if context_dem is None:
-                # Default zero context if DEM not supplied
+                import warnings
+                warnings.warn(
+                    "BharatSRMNetV4: context_dem is None but use_context_stream=True. "
+                    "Using zero-filled DEM context — this degrades physical consistency. "
+                    "Pass context_dem=(B, 2, H, W) with [elevation, slope] for correct behavior.",
+                    stacklevel=2,
+                )
                 context_dem = torch.zeros(
                     x_spectral.size(0), 2, x_spectral.size(2), x_spectral.size(3),
                     device=x_spectral.device, dtype=x_spectral.dtype
