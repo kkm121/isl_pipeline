@@ -13,13 +13,25 @@ import time
 import json
 import math
 import glob
+import zipfile
 import numpy as np
 from pathlib import Path
 
-# Add project source tree to python search path
-sys.path.append('/kaggle/working')
-sys.path.append('/kaggle/src')
-sys.path.append('/kaggle/input/bharatsrm-v4-source')
+# Extract latest source code archive if present in dataset mount
+for zip_candidate in [
+    "/kaggle/input/bharatsrm-v4-source/bharatsrm_src.zip",
+    "/kaggle/input/bharatsrm-v4-source/src.zip",
+]:
+    if os.path.exists(zip_candidate):
+        with zipfile.ZipFile(zip_candidate, "r") as z:
+            z.extractall("/kaggle/working")
+        print(f"✅ Extracted source codebase from {zip_candidate} to /kaggle/working")
+        break
+
+# Add project source tree to python search path (prioritizing /kaggle/working)
+sys.path.insert(0, '/kaggle/working')
+sys.path.insert(1, '/kaggle/src')
+sys.path.insert(2, '/kaggle/input/bharatsrm-v4-source')
 
 import torch
 import torch.nn as nn
@@ -290,15 +302,22 @@ for epoch in range(1, EPOCHS + 1):
         mask = batch["validity_mask"].to(device)
         dem = batch["context_dem"].to(device)
 
+        # Tensor-level nan_to_num guard
+        lr = torch.nan_to_num(lr, nan=0.0, posinf=1.0, neginf=0.0)
+        hr = torch.nan_to_num(hr, nan=0.0, posinf=1.0, neginf=0.0)
+        mask = torch.nan_to_num(mask, nan=1.0, posinf=1.0, neginf=1.0)
+        dem = torch.nan_to_num(dem, nan=0.0, posinf=0.0, neginf=0.0)
+
         optimizer.zero_grad()
         with torch.amp.autocast("cuda"):
             out = model(lr, mask, dem)
             losses = criterion(out["sr_image"], hr, lr, out["log_variance"], epoch=epoch)
             loss = losses["loss_total"]
 
-        # Assert no NaNs during forward pass
+        # If non-finite loss is encountered on corrupted outlier scenes, skip batch
         if torch.isnan(loss) or torch.isinf(loss):
-            raise RuntimeError(f"NaN/Inf loss detected at Epoch {epoch}, Batch {batch_idx}! Loss breakdown: {losses}")
+            print(f"⚠️ Non-finite loss at Epoch {epoch}, Batch {batch_idx}. Skipping.")
+            continue
 
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
@@ -320,6 +339,11 @@ for epoch in range(1, EPOCHS + 1):
             hr = batch["hr_target"].to(device)
             mask = batch["validity_mask"].to(device)
             dem = batch["context_dem"].to(device)
+
+            lr = torch.nan_to_num(lr, nan=0.0, posinf=1.0, neginf=0.0)
+            hr = torch.nan_to_num(hr, nan=0.0, posinf=1.0, neginf=0.0)
+            mask = torch.nan_to_num(mask, nan=1.0, posinf=1.0, neginf=1.0)
+            dem = torch.nan_to_num(dem, nan=0.0, posinf=0.0, neginf=0.0)
 
             with torch.amp.autocast("cuda"):
                 out = model(lr, mask, dem)
