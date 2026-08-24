@@ -277,7 +277,10 @@ class KernelSensitivityEvaluator:
         if hasattr(psf_kernel, "kernel"):
             psf_kernel = psf_kernel.to(sr_image.device)
 
-        if lr_observed.size(1) > self.num_bands:
+        if lr_observed.size(1) >= 10:
+            # Index 2 = B4 (Red), Index 1 = B3 (Green), Index 0 = B2 (Blue), Index 3 = B8 (NIR)
+            lr_ref = lr_observed[:, [2, 1, 0, 3], :, :]
+        elif lr_observed.size(1) > self.num_bands:
             lr_ref = lr_observed[:, : self.num_bands, :, :]
         else:
             lr_ref = lr_observed

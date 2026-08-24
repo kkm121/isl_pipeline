@@ -91,9 +91,10 @@ class PartialConv2d(nn.Module):
         # mask_sum shape: (B, 1, H_out, W_out)
         with torch.no_grad():
             mask_in = mask if self.multi_channel_mask else mask[:, :1, :, :]
+            mask_kernel = self.mask_kernel.to(device=mask_in.device, dtype=mask_in.dtype)
             mask_sum = F.conv2d(
                 mask_in,
-                self.mask_kernel,
+                mask_kernel,
                 bias=None,
                 stride=self.stride,
                 padding=self.padding,

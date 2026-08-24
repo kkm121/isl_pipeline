@@ -1,11 +1,11 @@
 {
   "id": "kkm121121/bharatsrm-net-v4-pretraining",
   "title": "BharatSRM-Net v4 Pretraining",
-  "code_file": "templates/kaggle_worldstrat_pretrain.py",
+  "code_file": "templates/kaggle_real_world_master_benchmark.py",
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
-  "enable_gpu": "true", "accelerator": "T4x2",
+  "enable_gpu": "true",
   "enable_internet": "true",
   "dataset_sources": ["jucor1/worldstrat", "kkm121121/bharatsrm-v4-source"]
 }

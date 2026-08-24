@@ -145,8 +145,10 @@ class StructuralSSIMLoss(nn.Module):
         # Sobel edge filters
         sobel_x = torch.tensor([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]]).unsqueeze(0).unsqueeze(0).repeat(in_channels, 1, 1, 1)
         sobel_y = torch.tensor([[-1.0, -2.0, -1.0], [0.0, 0.0, 0.0], [1.0, 2.0, 1.0]]).unsqueeze(0).unsqueeze(0).repeat(in_channels, 1, 1, 1)
+        laplacian = torch.tensor([[0.0, 1.0, 0.0], [1.0, -4.0, 1.0], [0.0, 1.0, 0.0]]).unsqueeze(0).unsqueeze(0).repeat(in_channels, 1, 1, 1)
         self.register_buffer("sobel_x", sobel_x)
         self.register_buffer("sobel_y", sobel_y)
+        self.register_buffer("laplacian", laplacian)
 
     def _ssim(self, img1: torch.Tensor, img2: torch.Tensor) -> torch.Tensor:
         padd = self.window_size // 2
@@ -175,16 +177,21 @@ class StructuralSSIMLoss(nn.Module):
         target = target.float()
         ssim_term = 1.0 - self._ssim(pred, target)
 
-        # Sobel edge gradient term
+        # Sobel & Laplacian edge gradient terms
         sobel_x = self.sobel_x.to(device=pred.device, dtype=pred.dtype)
         sobel_y = self.sobel_y.to(device=pred.device, dtype=pred.dtype)
+        laplacian = self.laplacian.to(device=pred.device, dtype=pred.dtype)
+
         gx_pred = F.conv2d(pred, sobel_x, padding=1, groups=self.in_channels)
         gy_pred = F.conv2d(pred, sobel_y, padding=1, groups=self.in_channels)
+        lap_pred = F.conv2d(pred, laplacian, padding=1, groups=self.in_channels)
+
         gx_tgt = F.conv2d(target, sobel_x, padding=1, groups=self.in_channels)
         gy_tgt = F.conv2d(target, sobel_y, padding=1, groups=self.in_channels)
+        lap_tgt = F.conv2d(target, laplacian, padding=1, groups=self.in_channels)
 
-        edge_loss = F.l1_loss(gx_pred, gx_tgt) + F.l1_loss(gy_pred, gy_tgt)
-        return ssim_term + 0.5 * edge_loss
+        edge_loss = F.l1_loss(gx_pred, gx_tgt) + F.l1_loss(gy_pred, gy_tgt) + 0.5 * F.l1_loss(lap_pred, lap_tgt)
+        return ssim_term + 0.8 * edge_loss
 
 
 class HeteroscedasticUncertaintyLoss(nn.Module):
@@ -220,10 +227,10 @@ class CompositeBharatSRMLoss(nn.Module):
     def __init__(
         self,
         lambda_rec: float = 1.0,
-        lambda_spec: float = 0.1,
-        lambda_degrade: float = 0.5,
-        lambda_struct: float = 0.2,
-        lambda_conf: float = 0.05,
+        lambda_spec: float = 0.2,
+        lambda_degrade: float = 0.3,
+        lambda_struct: float = 0.5,
+        lambda_conf: float = 0.01,
     ):
         super().__init__()
         self.lambda_rec = lambda_rec

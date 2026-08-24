@@ -1,0 +1,39 @@
+{
+    "benchmark_dataset": "WorldStrat_Real_Heldout_Val_786_Scenes",
+    "comparative_baselines": {
+        "Bicubic (Interpolation Control)": {
+            "PSNR": 12.421209653218588,
+            "SSIM": 0.49386383841435116,
+            "SAM": 14.259602546691895,
+            "ERGAS": 35.48936653137207,
+            "RMSE": 0.2599365909894307
+        },
+        "EDSR (Trained CNN Control)": {
+            "PSNR": 11.128819465637207,
+            "SSIM": 0.03866297965093205,
+            "SAM": 7.2798393567403155,
+            "ERGAS": 35.04855982462565,
+            "RMSE": 0.2777329385280609
+        },
+        "SRResNet (Trained Residual Control)": {
+            "PSNR": 14.69897715250651,
+            "SSIM": 0.5043536275625229,
+            "SAM": 12.988578160603842,
+            "ERGAS": 25.52227846781413,
+            "RMSE": 0.184813991189003
+        },
+        "BharatSRM-Net v4 (Full Master Architecture)": {
+            "PSNR": 15.900126139322916,
+            "SSIM": 0.5626332412163416,
+            "SAM": 14.025755882263184,
+            "ERGAS": 22.292873700459797,
+            "RMSE": 0.16950598607460657
+        }
+    },
+    "uncertainty_calibration": {
+        "raw_spread_skill_corr": 0.17276916187445757,
+        "empirical_mse": 0.020708084106445312,
+        "fitted_temperature": 0.43176145835899693,
+        "calibrated_ence_percent": 48.10134121825871
+    }
+}

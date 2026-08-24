@@ -112,7 +112,12 @@ class TiledInferenceEngine:
                     # Blend with Hanning window
                     cur_h = out_ye - out_ys
                     cur_w = out_xe - out_xs
-                    win = self.hanning_hr[:, :, :cur_h, :cur_w]
+                    if cur_h == self.hr_tile_size and cur_w == self.hr_tile_size:
+                        win = self.hanning_hr
+                    else:
+                        win = torch.from_numpy(
+                            create_2d_hanning_window(cur_h, cur_w)
+                        ).unsqueeze(0).unsqueeze(0).to(self.device)
 
                     hr_image_accum[:, :, out_ys:out_ye, out_xs:out_xe] += sr_patch * win
                     hr_var_accum[:, :, out_ys:out_ye, out_xs:out_xe] += var_patch * win

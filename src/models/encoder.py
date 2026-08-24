@@ -192,15 +192,19 @@ class ContextEncoder(nn.Module):
 
     def __init__(self, in_channels: int = 2, out_channels: int = 32):
         super().__init__()
+        c_mid = max(2, out_channels // 2)
+        c_out = max(2, out_channels)
+        g_mid = 8 if c_mid % 8 == 0 else (4 if c_mid % 4 == 0 else (2 if c_mid % 2 == 0 else 1))
+        g_out = 8 if c_out % 8 == 0 else (4 if c_out % 4 == 0 else (2 if c_out % 2 == 0 else 1))
         self.net = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels // 2, kernel_size=3, padding=1),
-            nn.GroupNorm(num_groups=min(8, out_channels // 2), num_channels=out_channels // 2),
+            nn.Conv2d(in_channels, c_mid, kernel_size=3, padding=1),
+            nn.GroupNorm(num_groups=g_mid, num_channels=c_mid),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(out_channels // 2, out_channels, kernel_size=3, padding=1),
-            nn.GroupNorm(num_groups=min(8, out_channels), num_channels=out_channels),
+            nn.Conv2d(c_mid, c_out, kernel_size=3, padding=1),
+            nn.GroupNorm(num_groups=g_out, num_channels=c_out),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.GroupNorm(num_groups=min(8, out_channels), num_channels=out_channels),
+            nn.Conv2d(c_out, c_out, kernel_size=3, padding=1),
+            nn.GroupNorm(num_groups=g_out, num_channels=c_out),
             nn.LeakyReLU(0.2, inplace=True),
         )
 

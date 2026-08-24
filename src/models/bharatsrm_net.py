@@ -147,8 +147,16 @@ class BharatSRMNetV4(nn.Module):
         else:
             f_fused = f_spec
 
+        # Extract 4-band base [Red, Green, Blue, NIR] for global residual learning
+        if x_spectral.size(1) >= 10:
+            lr_base = x_spectral[:, [2, 1, 0, 3], :, :]
+        elif x_spectral.size(1) >= 4:
+            lr_base = x_spectral[:, :4, :, :]
+        else:
+            lr_base = None
+
         # Step 3: Reconstruction and Uncertainty prediction
-        sr_image = self.reconstruction_head(f_fused)
+        sr_image = self.reconstruction_head(f_fused, lr_base=lr_base)
         log_var = self.uncertainty_head(f_fused)
         variance = self.uncertainty_head.get_variance(log_var)
         std_dev = self.uncertainty_head.get_std(log_var)
