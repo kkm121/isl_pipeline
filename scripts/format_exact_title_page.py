@@ -1,6 +1,6 @@
 """
 =============================================================================
-Update Slide 1 to match the exact SIH Title Page format shown in user's image
+Update Slide 1: Exact 18pt font size across all title page fields
 =============================================================================
 """
 
@@ -10,30 +10,31 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 
 PPT_FILES = [
-    r"C:\Users\muthu\Downloads\SIH2026-BharatSRM-Net-SmartEducation.pptx",
+    r"C:\Users\muthu\Downloads\SIH2026-Presentation-Final-18pt.pptx",
+    r"C:\Users\muthu\Downloads\SIH2026-IDEA-Presentation-ChaosToCode.pptx",
     r"C:\Users\muthu\Downloads\SIH2026-IDEA-Presentation-Format (2).pptx",
     r"C:\Users\muthu\Downloads\SIH2026-BharatSRM-Net-PitchDeck.pptx",
-    r"C:\Users\muthu\Downloads\SIH2026-IDEA-Presentation-ChaosToCode.pptx",
+    r"C:\Users\muthu\Downloads\SIH2026-BharatSRM-Net-SmartEducation.pptx",
 ]
 
-def format_title_page(path):
-    if not os.path.exists(path):
+def format_title_page_18pt(out_path):
+    template_path = r"C:\Users\muthu\Downloads\SIH2026-IDEA-Presentation-Format (2).pptx"
+    if not os.path.exists(template_path):
         return
     try:
-        prs = pptx.Presentation(path)
+        prs = pptx.Presentation(template_path)
         s1 = prs.slides[0]
         
-        # Hide or remove redundant extra subtitle/title placeholders if needed
         for shape in s1.shapes:
             if shape.has_text_frame:
                 if "TITLE PAGE" in shape.text or "SMART INDIA" in shape.text or "BharatSRM" in shape.text:
                     if shape.name == "Subtitle 3":
-                        shape.text_frame.clear() # Clear redundant subtitle
+                        shape.text_frame.clear()
                     else:
                         shape.top = Inches(0.4)
                         shape.left = Inches(0.5)
                         shape.width = Inches(8.0)
-                        shape.height = Inches(0.8)
+                        shape.height = Inches(0.7)
                         shape.text_frame.clear()
                         p = shape.text_frame.paragraphs[0]
                         p.text = "TITLE PAGE"
@@ -42,10 +43,10 @@ def format_title_page(path):
                         p.font.name = "Arial"
                         p.font.color.rgb = RGBColor(0, 0, 0)
                 elif "Problem Statement ID" in shape.text:
-                    shape.top = Inches(1.5)
+                    shape.top = Inches(1.3)
                     shape.left = Inches(0.5)
-                    shape.width = Inches(7.5)
-                    shape.height = Inches(5.2)
+                    shape.width = Inches(12.0)
+                    shape.height = Inches(5.5)
                     tf = shape.text_frame
                     tf.clear()
                     
@@ -66,22 +67,22 @@ def format_title_page(path):
                         r1 = p.add_run()
                         r1.text = label
                         r1.font.bold = True
-                        r1.font.size = Pt(13)
+                        r1.font.size = Pt(18) # 18pt font size
                         r1.font.name = "Arial"
                         r1.font.color.rgb = RGBColor(0, 0, 0)
                         
                         r2 = p.add_run()
                         r2.text = val
                         r2.font.bold = True
-                        r2.font.size = Pt(13)
+                        r2.font.size = Pt(18) # 18pt font size
                         r2.font.name = "Arial"
-                        r2.font.color.rgb = RGBColor(16, 56, 107) # Exact SIH Navy Blue
+                        r2.font.color.rgb = RGBColor(16, 56, 107) # SIH Navy Blue
 
-        prs.save(path)
-        print(f"[SUCCESS] Updated Title Page for: {path}")
+        prs.save(out_path)
+        print(f"[SUCCESS] Updated Title Page (18pt) for: {out_path}")
     except Exception as e:
-        print(f"[NOTE] Could not update {path}: {e}")
+        print(f"[NOTE] Could not update {out_path}: {e}")
 
 if __name__ == "__main__":
     for p in PPT_FILES:
-        format_title_page(p)
+        format_title_page_18pt(p)
