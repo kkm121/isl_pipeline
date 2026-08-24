@@ -1,32 +1,29 @@
 """
 =============================================================================
-Generate High-Quality Business & Architecture Diagrams for SIH Presentation
+Generate Executive Business Pitch Diagrams for SIH Presentation
 =============================================================================
 """
 
 import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from PIL import Image
 
 OUT_DIR = "outputs/ppt_diagrams"
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# -------------------------------------------------------------
-# 1. Slide 2 Diagram: Business Value Proposition Flow
-# -------------------------------------------------------------
+# 1. Slide 2: The Core Business Value Proposition
 def make_diagram_slide2():
     fig, ax = plt.subplots(figsize=(10, 4.2), dpi=300)
     ax.set_facecolor("#0b0f19")
     fig.patch.set_facecolor("#0b0f19")
     ax.axis("off")
 
-    # Card 1: Input
+    # Card 1: Free Input
     rect1 = patches.FancyBboxPatch((0.05, 0.2), 0.26, 0.65, boxstyle="round,pad=0.03", ec="#38bdf8", fc="#1e293b", lw=2)
     ax.add_patch(rect1)
-    ax.text(0.18, 0.72, "FREE INPUT DATA", color="#38bdf8", weight="bold", fontsize=11, ha="center")
-    ax.text(0.18, 0.58, "10m Sentinel-2 L2A\n+ CartoDEM Elevation", color="white", weight="bold", fontsize=10, ha="center")
-    ax.text(0.18, 0.35, "• Global 5-Day Revisit\n• 100% Free / Open API\n• ₹0 Cost to Government", color="#94a3b8", fontsize=9, ha="center")
+    ax.text(0.18, 0.72, "FREE RAW SATELLITE DATA", color="#38bdf8", weight="bold", fontsize=10, ha="center")
+    ax.text(0.18, 0.58, "10m Sentinel-2 (Copernicus)\n+ ISRO Elevation Maps", color="white", weight="bold", fontsize=9.5, ha="center")
+    ax.text(0.18, 0.35, "• Global 5-Day Revisit\n• 100% Free Public Data\n• ₹0 Satellite Acquisition Cost", color="#94a3b8", fontsize=8.5, ha="center")
 
     # Arrow 1
     ax.annotate("", xy=(0.38, 0.52), xytext=(0.32, 0.52), arrowprops=dict(arrowstyle="->", color="#38bdf8", lw=3))
@@ -34,28 +31,25 @@ def make_diagram_slide2():
     # Card 2: AI Engine
     rect2 = patches.FancyBboxPatch((0.39, 0.15), 0.28, 0.75, boxstyle="round,pad=0.03", ec="#818cf8", fc="#1e1b4b", lw=2.5)
     ax.add_patch(rect2)
-    ax.text(0.53, 0.76, "BHARATSRM-NET v4", color="#a5b4fc", weight="bold", fontsize=12, ha="center")
-    ax.text(0.53, 0.62, "Physics-Consistent AI Core", color="#38bdf8", weight="bold", fontsize=10, ha="center")
-    ax.text(0.53, 0.38, "• PartialConv Cloud Masking\n• AC-FEM Context Fusion\n• Zero-DC Residual Learning\n• Calibrated Uncertainty", color="#cbd5e1", fontsize=9, ha="center")
+    ax.text(0.53, 0.76, "BHARATSRM-NET ENGINE", color="#a5b4fc", weight="bold", fontsize=11, ha="center")
+    ax.text(0.53, 0.62, "AI-Powered Spatial Enhancement", color="#38bdf8", weight="bold", fontsize=9.5, ha="center")
+    ax.text(0.53, 0.38, "• 4x Super-Resolution Core\n• True-Color Physics Engine\n• Built-in AI Confidence Meter\n• Cloud & Shadow Recovery", color="#cbd5e1", fontsize=8.5, ha="center")
 
     # Arrow 2
     ax.annotate("", xy=(0.74, 0.52), xytext=(0.68, 0.52), arrowprops=dict(arrowstyle="->", color="#38bdf8", lw=3))
 
-    # Card 3: Output Products
+    # Card 3: Actionable Value
     rect3 = patches.FancyBboxPatch((0.75, 0.12), 0.22, 0.82, boxstyle="round,pad=0.03", ec="#4ade80", fc="#064e3b", lw=2)
     ax.add_patch(rect3)
-    ax.text(0.86, 0.82, "COMMERCIAL VALUE", color="#4ade80", weight="bold", fontsize=11, ha="center")
-    ax.text(0.86, 0.68, "2.5m Sub-Meter Output", color="white", weight="bold", fontsize=10, ha="center")
-    ax.text(0.86, 0.38, "• 16x Pixel Density\n• PMGSY Rural Roads\n• ISRO 5-Class LULC\n• Defense Confidence Map\n• Saves ₹100s of Crores", color="#cbd5e1", fontsize=8.5, ha="center")
+    ax.text(0.86, 0.82, "COMMERCIAL VALUE", color="#4ade80", weight="bold", fontsize=10.5, ha="center")
+    ax.text(0.86, 0.68, "2.5m Actionable Output", color="white", weight="bold", fontsize=9.5, ha="center")
+    ax.text(0.86, 0.38, "• 16x Sharper Ground Detail\n• Village Road Mapping\n• Farm Boundary Tracking\n• Defense Security Insights\n• Saves ₹100s of Crores", color="#cbd5e1", fontsize=8, ha="center")
 
     plt.tight_layout()
     plt.savefig(f"{OUT_DIR}/diagram_slide2.png", bbox_inches="tight", dpi=300)
     plt.close()
-    print("[OK] Generated diagram_slide2.png")
 
-# -------------------------------------------------------------
-# 2. Slide 3 Diagram: 3-Stage End-to-End Architecture
-# -------------------------------------------------------------
+# 2. Slide 3: End-to-End System Workflow
 def make_diagram_slide3():
     fig, ax = plt.subplots(figsize=(10, 4.2), dpi=300)
     ax.set_facecolor("#0b0f19")
@@ -63,9 +57,9 @@ def make_diagram_slide3():
     ax.axis("off")
 
     stages = [
-        ("STAGE 1: INGESTION", "#0284c7", "#0c4a6e", ["10-Band Sentinel-2 (B2-B12)", "CartoDEM Slope & Aspect", "S2cloudless / QA60 Mask", "Windowed COG Streaming"]),
-        ("STAGE 2: AI CORE", "#6366f1", "#312e81", ["PartialConv2d Cloud Inpainting", "AC-FEM Cross-Attention", "Dilated Residual Blocks (r=1,2,4,8)", "ICNR PixelShuffle (s=4)"]),
-        ("STAGE 3: MULTI-TASK DELIVERY", "#059669", "#064e3b", ["2.5m True-Color Super-Res", "Calibrated Uncertainty (σ²)", "PMGSY Rural Road Vectors", "ISRO 5-Class LULC Map"]),
+        ("1. INGESTION", "#0284c7", "#0c4a6e", ["Free 10m Satellite Imagery", "ISRO Elevation & Slope Maps", "Automatic Cloud & Haze Filter", "Instant Seamless Streaming"]),
+        ("2. AI ENHANCEMENT", "#6366f1", "#312e81", ["Multi-Spectral Deep Neural Net", "Terrain & Elevation Context Fusion", "Sub-Pixel Detail Reconstruction", "True-Color Physics Guarantee"]),
+        ("3. ACTIONABLE INSIGHTS", "#059669", "#064e3b", ["2.5m Commercial-Grade Image", "AI Trust & Confidence Map", "PMGSY Village Road Extraction", "ISRO Land-Use Classification"]),
     ]
 
     for i, (title, ec, fc, bullets) in enumerate(stages):
@@ -76,7 +70,7 @@ def make_diagram_slide3():
         
         y_text = 0.62
         for b in bullets:
-            ax.text(x + 0.02, y_text, f"► {b}", color="#e2e8f0", fontsize=8.5, va="top")
+            ax.text(x + 0.02, y_text, f"✔ {b}", color="#e2e8f0", fontsize=8.5, va="top")
             y_text -= 0.13
 
         if i < 2:
@@ -85,11 +79,8 @@ def make_diagram_slide3():
     plt.tight_layout()
     plt.savefig(f"{OUT_DIR}/diagram_slide3.png", bbox_inches="tight", dpi=300)
     plt.close()
-    print("[OK] Generated diagram_slide3.png")
 
-# -------------------------------------------------------------
-# 3. Slide 4 Diagram: Feasibility & Deployment Pipeline
-# -------------------------------------------------------------
+# 3. Slide 4: Deployment & Operations
 def make_diagram_slide4():
     fig, ax = plt.subplots(figsize=(10, 4.2), dpi=300)
     ax.set_facecolor("#0b0f19")
@@ -97,20 +88,20 @@ def make_diagram_slide4():
     ax.axis("off")
 
     boxes = [
-        ("OPEN SATELLITE APIS", "#0284c7", "#0c4a6e", ["Copernicus Data Space", "ISRO Bhuvan CartoDEM", "Direct COG Windowing"]),
-        ("SEALED CONTAINER", "#8b5cf6", "#4c1d95", ["Docker Sandboxed", "PyTorch AMP FP16", "INT8 Edge Quantization"]),
-        ("DEPLOYMENT TARGETS", "#10b981", "#064e3b", ["Air-Gapped Defense HQ", "Cloud Web GIS Studio", "Edge Field Drones / Tablets"]),
+        ("DATA SOURCING", "#0284c7", "#0c4a6e", ["Copernicus Open Access Hub", "ISRO Bhuvan Portal", "100% Free & Open-Source"]),
+        ("SECURE AI PLATFORM", "#8b5cf6", "#4c1d95", ["High-Speed GPU/CPU Engine", "Offline Air-Gapped Ready", "Sub-Second Processing Time"]),
+        ("END USERS & MINISTRIES", "#10b981", "#064e3b", ["NTRO & Defense Command", "Rural Development (PMGSY)", "Agriculture & Disaster Teams"]),
     ]
 
     for i, (title, ec, fc, bullets) in enumerate(boxes):
         x = 0.05 + i * 0.32
         rect = patches.FancyBboxPatch((x, 0.18), 0.27, 0.70, boxstyle="round,pad=0.03", ec=ec, fc=fc, lw=2)
         ax.add_patch(rect)
-        ax.text(x + 0.135, 0.76, title, color="white", weight="bold", fontsize=10.5, ha="center")
+        ax.text(x + 0.135, 0.76, title, color="white", weight="bold", fontsize=10, ha="center")
         
         y_text = 0.60
         for b in bullets:
-            ax.text(x + 0.02, y_text, f"✔ {b}", color="#f1f5f9", fontsize=9, va="top")
+            ax.text(x + 0.02, y_text, f"✔ {b}", color="#f1f5f9", fontsize=8.5, va="top")
             y_text -= 0.14
 
         if i < 2:
@@ -119,19 +110,15 @@ def make_diagram_slide4():
     plt.tight_layout()
     plt.savefig(f"{OUT_DIR}/diagram_slide4.png", bbox_inches="tight", dpi=300)
     plt.close()
-    print("[OK] Generated diagram_slide4.png")
 
-# -------------------------------------------------------------
-# 4. Slide 5 Diagram: ROI & Competitive Advantage Matrix
-# -------------------------------------------------------------
+# 4. Slide 5: Market ROI & Competitive Advantage
 def make_diagram_slide5():
     fig, ax = plt.subplots(figsize=(10, 4.2), dpi=300)
     ax.set_facecolor("#0b0f19")
     fig.patch.set_facecolor("#0b0f19")
     ax.axis("off")
 
-    # Table Header
-    headers = ["Feature / Capability", "Foreign Commercial (SPOT 6/7)", "Standard Bicubic / GANs", "BharatSRM-Net v4 (Our Solution)"]
+    headers = ["Evaluation Metric", "Commercial Satellites", "Standard AI Tools", "BharatSRM-Net (Our Pitch)"]
     x_positions = [0.03, 0.30, 0.56, 0.81]
     widths = [0.25, 0.24, 0.23, 0.26]
 
@@ -143,11 +130,11 @@ def make_diagram_slide5():
         ax.text(x + (w-0.02)/2, 0.84, h, color="white", weight="bold", fontsize=8.5, ha="center")
 
     rows = [
-        ("Cost per 1,000 km²", "₹12,00,000+ ($15/km²)", "₹0 (Free Interpolation)", "₹0 (100% Free Open Data)"),
-        ("Spatial Resolution", "1.5m - 2.5m Commercial", "10m Smeared (Blurry)", "2.5m Super-Resolved (<4m)"),
-        ("Anti-Hallucination", "None (Physical Optical)", "High Hallucination Risk", "Calibrated Uncertainty (σ²)"),
-        ("Multi-Task Analytics", "None (Raw Image Only)", "None", "PMGSY Roads + ISRO LULC"),
-        ("Sovereign Security", "Foreign Satellite Dependency", "N/A", "100% Indigenous & Air-Gapped"),
+        ("Procurement Cost", "₹12,00,000+ per 1,000 km²", "Free (Poor Quality)", "₹0 (100% Free Open Data)"),
+        ("Ground Detail Quality", "2.5m Commercial Grade", "10m Blurry / Unclear", "2.5m Super-Resolved (<4m)"),
+        ("AI Trust & Confidence", "No Confidence Scoring", "High AI Guesswork Risk", "Built-in Trust Map (σ²)"),
+        ("Built-in Analytics", "None (Raw Images Only)", "None", "Roads + Farm Boundaries"),
+        ("Sovereign Security", "Foreign Vendor Dependent", "Non-Compliant", "100% Indigenous & Secure"),
     ]
 
     for i, (f, c1, c2, c3) in enumerate(rows):
@@ -162,11 +149,10 @@ def make_diagram_slide5():
     plt.tight_layout()
     plt.savefig(f"{OUT_DIR}/diagram_slide5.png", bbox_inches="tight", dpi=300)
     plt.close()
-    print("[OK] Generated diagram_slide5.png")
 
 if __name__ == "__main__":
     make_diagram_slide2()
     make_diagram_slide3()
     make_diagram_slide4()
     make_diagram_slide5()
-    print("\n[SUCCESS] All 4 slide diagrams generated successfully!")
+    print("[SUCCESS] Business pitch diagrams refreshed!")
