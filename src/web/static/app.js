@@ -150,6 +150,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.status === "success") {
         currentResults = data;
+        const emptyState = document.getElementById("emptyState");
+        if (emptyState) emptyState.style.display = "none";
         imgLeft.src = data.lr_image_b64;
         renderCurrentView();
 
@@ -187,6 +189,5 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Run on load
-  triggerInference();
+  // Do not auto-run default scene on reload; wait for user upload or preset selection
 });
