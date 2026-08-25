@@ -20,8 +20,11 @@ from pathlib import Path
 
 import cv2
 import torch
+import torch.nn as nn
 import numpy as np
 from PIL import Image
+import rasterio
+from skimage.filters import frangi
 import matplotlib.cm as cm
 
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
@@ -310,31 +313,26 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Transport Corridor Linear Ribbon Filter)
-        gray_uint = (gray * 255.0).astype(np.uint8)
-        smooth_gray = cv2.bilateralFilter(gray_uint, d=7, sigmaColor=50, sigmaSpace=9)
-        angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
-        responses = []
-        for ang in angles:
-            rad = np.deg2rad(ang)
-            length = 21
-            kernel = np.zeros((length, length), dtype=np.uint8)
-            cx, cy = length // 2, length // 2
-            for i in range(-cx, cx + 1):
-                kx = int(cx + i * np.cos(rad))
-                ky = int(cy + i * np.sin(rad))
-                if 0 <= kx < length and 0 <= ky < length:
-                    kernel[ky, kx] = 1
-            th = cv2.morphologyEx(smooth_gray, cv2.MORPH_TOPHAT, kernel)
-            responses.append(th)
-
-        max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 22, 255, cv2.THRESH_BINARY)
-        closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+        # 5. Continuous PMGSY Rural Road Network Extraction (Hessian Eigenvalue Ridge Filter)
+        # Frangi vesselness perfectly isolates linear transport corridors and completely ignores urban building grids.
+        gray_float = gray.copy()
         
-        # Exclude bright building rooftops (houses/metal roofs are not roads)
-        is_bright_roof = (R_hr > 0.58) & (G_hr > 0.52) & (B_hr > 0.42) & (gray_uint > 140)
-        valid_roads = (closed_roads > 0) & (~is_bright_roof) & (~water_mask)
+        # Detect dark roads (asphalt in urban) and bright roads (dirt/gravel in rural)
+        roadness_dark = frangi(gray_float, sigmas=np.arange(1.5, 4.5, 1.0), black_ridges=True)
+        roadness_bright = frangi(gray_float, sigmas=np.arange(1.5, 4.5, 1.0), black_ridges=False)
+        roadness = np.maximum(roadness_dark, roadness_bright)
+        
+        # Normalize and strict threshold
+        p95 = np.percentile(roadness, 98)
+        norm_road = np.clip(roadness / (p95 + 1e-6), 0.0, 1.0)
+        binary_roads = norm_road > 0.40
+        
+        # Clean up to connect continuous highway segments
+        closed_roads = cv2.morphologyEx(binary_roads.astype(np.uint8)*255, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+        
+        # Suppress noise over water and thick vegetation
+        is_thick_veg = (G_hr > R_hr + 0.08) & (G_hr > 0.40) & (B_hr < 0.35)
+        valid_roads = (closed_roads > 0) & (~water_mask) & (~is_thick_veg)
         
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(valid_roads.astype(np.uint8)*255)
         clean_roads = np.zeros_like(valid_roads, dtype=bool)
@@ -343,8 +341,8 @@ async def run_super_resolution(
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
             span = max(sw, sh)
-            # Transport corridor filter: requires continuous linear span (rejects small isolated house blocks)
-            if span >= 45 and area >= 35:
+            # Require minimum continuous span of 50px (rejects small isolated fragments)
+            if span >= 50 and area >= 40:
                 clean_roads[labels == i] = True
 
         road_overlay = np.array(sr_img).copy()
@@ -352,6 +350,7 @@ async def run_super_resolution(
         road_b64 = pil_to_base64(Image.fromarray(road_overlay))
 
         # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & Ground-Truth Aligned)
+        gray_uint = (gray * 255.0).astype(np.uint8)
         # Water: Dark with cyan/blue absorption (R < 0.32, G > R + 0.04 or B > R) - Zero false white roofs
         water_raw = (R_hr < 0.32) & (((G_hr > R_hr + 0.04) & (B_hr > 0.25)) | ((B_hr > R_hr + 0.05) & (gray_uint < 85))) | ((G_hr > R_hr + 0.03) & (G_hr > 0.45) & (B_hr > 0.35))
         water_closed = cv2.morphologyEx((water_raw.astype(np.uint8))*255, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
