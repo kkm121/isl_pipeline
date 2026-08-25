@@ -310,21 +310,17 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Dual-Corridor Black/White Top-Hat + Spectral Gating)
+        # 5. Continuous PMGSY Rural Road Network Extraction (Dual Black/White Top-Hat + Vector Skeletonization)
         gray_uint = (gray * 255.0).astype(np.uint8)
         smooth_gray = cv2.bilateralFilter(gray_uint, d=5, sigmaColor=30, sigmaSpace=5)
         
-        # Paved road materials (asphalt, concrete, bitumen) have low color spread (|R-B| and |R-G| small)
-        color_spread_road = np.maximum(np.maximum(np.abs(R_hr - G_hr), np.abs(G_hr - B_hr)), np.abs(R_hr - B_hr))
-        is_road_material = (color_spread_road < 0.095) & (gray_uint > 45) & (gray_uint < 225)
-        
-        # Extract both dark asphalt street valleys (in cities) and bright paved highways/arterials
+        # Dual directional line filters extracting dark asphalt expressways/streets + bright paved roadways
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
         
         for ang in angles:
             rad = np.deg2rad(ang)
-            length = 17
+            length = 21
             kernel = np.zeros((length, length), dtype=np.uint8)
             cx, cy = length // 2, length // 2
             for i in range(-cx, cx + 1):
@@ -337,10 +333,9 @@ async def run_super_resolution(
             responses.append(cv2.bitwise_or(b_th, w_th))
             
         max_resp = np.maximum.reduce(responses)
-        _, road_cand = cv2.threshold(max_resp, 10, 255, cv2.THRESH_BINARY)
+        _, road_cand = cv2.threshold(max_resp, 12, 255, cv2.THRESH_BINARY)
         
-        valid_roads = (road_cand > 0) & is_road_material
-        closed_roads = cv2.morphologyEx(valid_roads.astype(np.uint8)*255, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+        closed_roads = cv2.morphologyEx(road_cand, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
         road_mask = np.zeros_like(closed_roads, dtype=bool)
@@ -350,7 +345,7 @@ async def run_super_resolution(
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
             length_span = max(sw, sh)
-            if length_span >= 20 and area >= 15:
+            if length_span >= 22 and area >= 15:
                 road_mask[labels == i] = True
                     
         # Zhang-Suen Thinning to extract exact 2px clean road centerlines
@@ -366,21 +361,28 @@ async def run_super_resolution(
         road_b64 = pil_to_base64(Image.fromarray(road_overlay))
 
         # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & Ground-Truth Aligned)
-        # Forest: Dark dense canopy
-        forest_mask = (R_hr < 0.40) & (G_hr < 0.45) & (B_hr < 0.34) & (G_hr >= R_hr * 0.90) & (~water_mask)
-        
-        # Built-up / Urban: Neutral gray concrete/asphalt (|R-G| and |G-B| small) with high urban structure
-        gray_hr = 0.299 * R_hr + 0.587 * G_hr + 0.114 * B_hr
-        color_spread = np.maximum(np.maximum(np.abs(R_hr - G_hr), np.abs(G_hr - B_hr)), np.abs(R_hr - B_hr))
-        builtup_mask = (color_spread < 0.070) & (gray_hr > 0.32) & (gray_hr < 0.72) & (~water_mask) & (~forest_mask)
+        # Water: Dark with cyan/blue absorption (R < 0.32, G > R + 0.04 or B > R) - Zero false white roofs
+        water_raw = (R_hr < 0.32) & (((G_hr > R_hr + 0.04) & (B_hr > 0.25)) | ((B_hr > R_hr + 0.05) & (gray_uint < 85))) | ((G_hr > R_hr + 0.03) & (G_hr > 0.45) & (B_hr > 0.35))
+        water_closed = cv2.morphologyEx((water_raw.astype(np.uint8))*255, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
+        water_mask = water_closed > 0
 
-        # Agriculture / Crops: Active green vegetation or fertile agricultural parcel soil (distinguished from desert sand)
-        green_excess = G_hr - np.maximum(R_hr, B_hr)
-        is_crop_green = (green_excess > -0.03) & (G_hr > B_hr + 0.03) & (G_hr > 0.30)
-        is_agri_parcel = (R_hr >= 0.36) & (G_hr >= 0.30) & (B_hr < 0.35) & (R_hr > B_hr + 0.10) & (R_hr < 0.65) & (gray_hr < 0.50)
-        agri_mask = (is_crop_green | is_agri_parcel) & (~water_mask) & (~forest_mask) & (~builtup_mask)
+        # Forest: Dark canopy with green dominance
+        forest_mask = (R_hr < 0.38) & (G_hr < 0.45) & (B_hr < 0.34) & (G_hr >= R_hr * 0.90) & (~water_mask)
         
-        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain
+        # Agriculture: Requires genuine photosynthetic greenness or cultivated moisture
+        green_excess = G_hr - np.maximum(R_hr, B_hr)
+        is_crop_green = (green_excess > -0.02) & (G_hr > B_hr + 0.03) & (G_hr > 0.28)
+        is_agri_parcel = (R_hr >= 0.36) & (G_hr >= 0.30) & (B_hr < 0.35) & (R_hr > B_hr + 0.10) & (R_hr < 0.65) & (gray_uint < 130)
+        agri_mask = (is_crop_green | is_agri_parcel) & (~water_mask) & (~forest_mask)
+
+        # Built-up / Urban (Dense Buildings, White Roofs, Gray Concrete, City Grid)
+        is_bright_roof = (R_hr > 0.55) & (G_hr > 0.50) & (B_hr > 0.40)
+        lap = np.abs(cv2.Laplacian(gray_uint.astype(np.float32), cv2.CV_32F))
+        local_density = cv2.blur(lap, (9, 9))
+        is_urban_grid = (local_density > 6.0) & (R_hr < 0.75)
+        builtup_mask = (is_bright_roof | is_urban_grid) & (~water_mask) & (~forest_mask) & (~agri_mask)
+
+        # Barren Land / Desert Sand (Warm Sand)
         barren_mask = (~water_mask) & (~forest_mask) & (~agri_mask) & (~builtup_mask)
 
         lulc_vis = np.zeros((out_H, out_W, 3), dtype=np.uint8)
