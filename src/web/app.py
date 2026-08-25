@@ -75,6 +75,14 @@ for cp in candidate_ckpts:
 
 model.eval()
 
+# Global cache for latest super-resolution output (supports direct GeoTIFF export from any uploaded PNG/JPG)
+LATEST_SR_STATE = {
+    "bands": None,
+    "aoi_id": "user_lake",
+    "out_W": 2560,
+    "out_H": 1408,
+}
+
 AOI_CATALOG = {
     "user_lake": {
         "name": "Turquoise Lake & Reservoir Basin (Uploaded Scene)",
@@ -322,6 +330,13 @@ async def run_super_resolution(
             "RMSE": 0.1695,
         }
 
+        # Save to latest state cache for direct GeoTIFF export
+        nir_band = np.clip(sr_rgb_uint8[:, :, 1] * 0.8 + sr_rgb_uint8[:, :, 0] * 0.2, 0, 255).astype(np.uint8)
+        LATEST_SR_STATE["bands"] = np.stack([sr_rgb_uint8[:, :, 0], sr_rgb_uint8[:, :, 1], sr_rgb_uint8[:, :, 2], nir_band], axis=0)
+        LATEST_SR_STATE["aoi_id"] = aoi_id
+        LATEST_SR_STATE["out_W"] = out_W
+        LATEST_SR_STATE["out_H"] = out_H
+
         return JSONResponse(
             content={
                 "status": "success",
@@ -352,41 +367,26 @@ async def export_geotiff(aoi_id: str = "user_lake"):
         from rasterio.transform import from_bounds
         from fastapi.responses import FileResponse
         
-        rgb_in = load_scene_rgb(aoi_id)
-        H, W, _ = rgb_in.shape
-        out_H, out_W = H * 4, W * 4
+        if LATEST_SR_STATE["bands"] is not None:
+            out_bands = LATEST_SR_STATE["bands"]
+            out_H, out_W = LATEST_SR_STATE["out_H"], LATEST_SR_STATE["out_W"]
+            chosen_aoi = LATEST_SR_STATE["aoi_id"]
+        else:
+            rgb_in = load_scene_rgb(aoi_id)
+            H, W, _ = rgb_in.shape
+            out_H, out_W = H * 4, W * 4
+            sr_rgb = (cv2.resize(rgb_in, (out_W, out_H)) * 255).astype(np.uint8)
+            nir_band = np.clip(sr_rgb[:, :, 1] * 0.8 + sr_rgb[:, :, 0] * 0.2, 0, 255).astype(np.uint8)
+            out_bands = np.stack([sr_rgb[:, :, 0], sr_rgb[:, :, 1], sr_rgb[:, :, 2], nir_band], axis=0)
+            chosen_aoi = aoi_id
         
-        # Super-resolve RGB
-        img_uint8 = (rgb_in * 255.0).astype(np.uint8)
-        img_bgr = cv2.cvtColor(img_uint8, cv2.COLOR_RGB2BGR)
-        img_ycrcb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2YCrCb)
-        
-        Y = img_ycrcb[:, :, 0].astype(np.float32) / 255.0
-        Cr_hr = cv2.resize(img_ycrcb[:, :, 1], (out_W, out_H), interpolation=cv2.INTER_CUBIC)
-        Cb_hr = cv2.resize(img_ycrcb[:, :, 2], (out_W, out_H), interpolation=cv2.INTER_CUBIC)
-        Y_hr = cv2.resize(Y, (out_W, out_H), interpolation=cv2.INTER_CUBIC)
-        lap = cv2.Laplacian(Y_hr, cv2.CV_32F)
-        Y_sharp = np.clip(Y_hr - 0.35 * lap, 0.0, 1.0)
-        
-        out_ycrcb = np.zeros((out_H, out_W, 3), dtype=np.uint8)
-        out_ycrcb[:, :, 0] = (Y_sharp * 255.0).astype(np.uint8)
-        out_ycrcb[:, :, 1] = Cr_hr
-        out_ycrcb[:, :, 2] = Cb_hr
-        sr_rgb = cv2.cvtColor(cv2.cvtColor(out_ycrcb, cv2.COLOR_YCrCb2BGR), cv2.COLOR_BGR2RGB)
-        
-        # Synthesize NIR band (Band 4)
-        nir_band = np.clip(sr_rgb[:, :, 1] * 0.8 + sr_rgb[:, :, 0] * 0.2, 0, 255).astype(np.uint8)
-        
-        # 4-Band Tensor: (4, H, W) -> [Red, Green, Blue, NIR]
-        out_bands = np.stack([sr_rgb[:, :, 0], sr_rgb[:, :, 1], sr_rgb[:, :, 2], nir_band], axis=0)
-        
-        aoi_info = AOI_CATALOG.get(aoi_id, {"lat": 24.5854, "lon": 73.7125})
+        aoi_info = AOI_CATALOG.get(chosen_aoi, {"lat": 24.5854, "lon": 73.7125})
         lat, lon = aoi_info.get("lat", 24.5854), aoi_info.get("lon", 73.7125)
         d_deg = 0.04
         transform = from_bounds(lon - d_deg, lat - d_deg, lon + d_deg, lat + d_deg, out_W, out_H)
         
         os.makedirs("outputs/geotiffs", exist_ok=True)
-        tif_filename = f"outputs/geotiffs/BharatSRM_2.5m_{aoi_id}.tif"
+        tif_filename = f"outputs/geotiffs/BharatSRM_2.5m_{chosen_aoi}.tif"
         
         with rasterio.open(
             tif_filename,
@@ -407,7 +407,7 @@ async def export_geotiff(aoi_id: str = "user_lake"):
             
         return FileResponse(
             path=tif_filename,
-            filename=f"BharatSRM_2.5m_{aoi_id}.tif",
+            filename=f"BharatSRM_2.5m_{chosen_aoi}.tif",
             media_type="image/tiff",
         )
     except Exception as e:
