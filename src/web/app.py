@@ -269,9 +269,19 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Multi-Angle Linear Corridor Filter)
-        # Strict river exclusion: Rivers/streams are NEVER classified as roads
-        smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=7, sigmaColor=50, sigmaSpace=9)
+        # 5. Continuous PMGSY Rural Road Network Extraction (Transport Corridor Filter with Ravine Suppression)
+        # Suppress dark mountain crevices, wadis, and shadow gullies
+        gray_uint = (gray * 255.0).astype(np.uint8)
+        dark_crevices = (gray_uint < 65)
+        dark_crevices_dilated = cv2.dilate(dark_crevices.astype(np.uint8)*255, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))) > 0
+
+        # Terrain roughness: natural rocky fissures and wadis have extreme local standard deviation; paved roads are smooth corridors
+        mean_g = cv2.blur(gray_uint.astype(np.float32), (7, 7))
+        sq_mean_g = cv2.blur(gray_uint.astype(np.float32)**2, (7, 7))
+        local_roughness = np.sqrt(np.maximum(0, sq_mean_g - mean_g**2))
+        rugged_terrain_mask = local_roughness > 32.0
+
+        smooth_gray = cv2.bilateralFilter(gray_uint, d=7, sigmaColor=40, sigmaSpace=7)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
         for ang in angles:
@@ -288,23 +298,20 @@ async def run_super_resolution(
             responses.append(th)
 
         max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 22, 255, cv2.THRESH_BINARY)
+        _, road_thresh = cv2.threshold(max_resp, 20, 255, cv2.THRESH_BINARY)
         closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
-        clean_roads = np.zeros_like(closed_roads, dtype=bool)
+        valid_candidates = (closed_roads > 0) & (~water_mask) & (~dark_crevices_dilated) & (~rugged_terrain_mask) & (R_hr >= 0.20)
+        
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(valid_candidates.astype(np.uint8))
+        clean_roads = np.zeros_like(valid_candidates, dtype=bool)
         for i in range(1, num_labels):
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
             # Balanced road continuity filter (preserves arterial corridors and village paths)
-            if max(sw, sh) >= 30 and area >= 30:
+            if max(sw, sh) >= 25 and area >= 25:
                 clean_roads[labels == i] = True
-                
-        # Zero overlap with rivers, lakes, canals, and water beds
-        clean_roads = clean_roads & (~water_mask)
-        # Roads must have mineral/asphalt reflectance (never dark/turbid water)
-        clean_roads = clean_roads & (R_hr >= 0.20) & (gray >= 0.22)
 
         road_overlay = np.array(sr_img).copy()
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
