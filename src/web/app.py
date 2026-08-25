@@ -267,13 +267,13 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (High-Linearity Corridor Filter)
-        smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=9, sigmaColor=75, sigmaSpace=11)
+        # 5. Continuous PMGSY Rural Road Network Extraction (Multi-Angle Linear Corridor Filter)
+        smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=7, sigmaColor=50, sigmaSpace=9)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
         for ang in angles:
             rad = np.deg2rad(ang)
-            length = 25
+            length = 21
             kernel = np.zeros((length, length), dtype=np.uint8)
             cx, cy = length // 2, length // 2
             for i in range(-cx, cx + 1):
@@ -285,7 +285,7 @@ async def run_super_resolution(
             responses.append(th)
 
         max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 28, 255, cv2.THRESH_BINARY)
+        _, road_thresh = cv2.threshold(max_resp, 22, 255, cv2.THRESH_BINARY)
         closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
@@ -294,8 +294,8 @@ async def run_super_resolution(
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
-            # Strict corridor length span filter (length >= 50 px, area >= 45 px)
-            if max(sw, sh) >= 50 and area >= 45:
+            # Balanced road continuity filter (preserves arterial corridors and village paths)
+            if max(sw, sh) >= 30 and area >= 30:
                 clean_roads[labels == i] = True
         clean_roads = clean_roads & (~water_mask)
 
@@ -305,19 +305,20 @@ async def run_super_resolution(
 
         # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & Ground-Truth Aligned)
         # Forest: Dark dense canopy
-        forest_mask = (R_hr < 0.36) & (G_hr < 0.42) & (B_hr < 0.32) & (G_hr >= R_hr * 0.95) & (~water_mask)
-        
-        # Agriculture / Crops: Active vegetation requiring genuine photosynthetic greenness
-        # (Must have green excess over red or healthy NDGRI; ignores desert sand)
-        ndgri = (G_hr - R_hr) / (G_hr + R_hr + 1e-5)
-        agri_mask = ((ndgri > 0.02) | ((G_hr > R_hr) & (G_hr > B_hr + 0.04))) & (G_hr > 0.32) & (R_hr < 0.52) & (~water_mask) & (~forest_mask)
+        forest_mask = (R_hr < 0.40) & (G_hr < 0.45) & (B_hr < 0.34) & (G_hr >= R_hr * 0.90) & (~water_mask)
         
         # Built-up / Urban: Neutral gray concrete/asphalt (|R-G| and |G-B| small) with high urban structure
         gray_hr = 0.299 * R_hr + 0.587 * G_hr + 0.114 * B_hr
         color_spread = np.maximum(np.maximum(np.abs(R_hr - G_hr), np.abs(G_hr - B_hr)), np.abs(R_hr - B_hr))
-        builtup_mask = (color_spread < 0.08) & (gray_hr > 0.30) & (gray_hr < 0.75) & (~water_mask) & (~forest_mask) & (~agri_mask)
+        builtup_mask = (color_spread < 0.070) & (gray_hr > 0.32) & (gray_hr < 0.72) & (~water_mask) & (~forest_mask)
+
+        # Agriculture / Crops: Active green vegetation or fertile agricultural parcel soil (distinguished from desert sand)
+        green_excess = G_hr - np.maximum(R_hr, B_hr)
+        is_crop_green = (green_excess > -0.03) & (G_hr > B_hr + 0.03) & (G_hr > 0.30)
+        is_agri_parcel = (R_hr >= 0.36) & (G_hr >= 0.30) & (B_hr < 0.35) & (R_hr > B_hr + 0.10) & (R_hr < 0.65) & (gray_hr < 0.50)
+        agri_mask = (is_crop_green | is_agri_parcel) & (~water_mask) & (~forest_mask) & (~builtup_mask)
         
-        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain (R > G > B)
+        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain
         barren_mask = (~water_mask) & (~forest_mask) & (~agri_mask) & (~builtup_mask)
 
         lulc_vis = np.zeros((out_H, out_W, 3), dtype=np.uint8)
