@@ -182,15 +182,56 @@ async def run_super_resolution(
     try:
         t_start = time.time()
         
-        # 1. Ingest Input Satellite Imagery
+        # 1. Ingest Input Satellite Imagery (Supports both 16-bit GeoTIFFs & standard PNG/JPG)
+        crs_uploaded = None
+        transform_uploaded = None
+        
         if file is not None and file.filename:
             content = await file.read()
-            pil_input = Image.open(io.BytesIO(content)).convert("RGB")
-            w_orig, h_orig = pil_input.size
-            new_w = max(64, (w_orig // 32) * 32)
-            new_h = max(64, (h_orig // 32) * 32)
-            pil_input = pil_input.crop((0, 0, new_w, new_h))
-            rgb_in = np.array(pil_input).astype(np.float32) / 255.0
+            filename_lower = file.filename.lower()
+            
+            if filename_lower.endswith((".tif", ".tiff")):
+                import rasterio
+                from rasterio.io import MemoryFile
+                with MemoryFile(content) as memfile:
+                    with memfile.open() as src:
+                        crs_uploaded = src.crs
+                        transform_uploaded = src.transform
+                        H_src, W_src = src.height, src.width
+                        
+                        # Handle large full-swath scenes (e.g. 10,000x10,000 px) by reading central analysis window
+                        target_w = min(W_src, 640)
+                        target_h = min(H_src, 360)
+                        target_w = (target_w // 32) * 32
+                        target_h = (target_h // 32) * 32
+                        
+                        cy, cx = H_src // 2, W_src // 2
+                        win = rasterio.windows.Window(
+                            max(0, cx - target_w // 2),
+                            max(0, cy - target_h // 2),
+                            target_w,
+                            target_h,
+                        )
+                        # Read 3 bands (or 1st 3 if multi-spectral)
+                        count_to_read = min(3, src.count)
+                        data = src.read(list(range(1, count_to_read + 1)), window=win)
+                        if data.shape[0] == 1:
+                            data = np.repeat(data, 3, axis=0)
+                            
+                        # Robust remote sensing percentile normalization (16-bit uint16 -> float32 [0, 1])
+                        p2, p98 = np.percentile(data, (2, 98))
+                        if p98 > p2:
+                            data_norm = np.clip((data.astype(np.float32) - p2) / (p98 - p2), 0.0, 1.0)
+                        else:
+                            data_norm = np.clip(data.astype(np.float32) / 255.0, 0.0, 1.0)
+                        rgb_in = np.moveaxis(data_norm, 0, -1).astype(np.float32)
+            else:
+                pil_input = Image.open(io.BytesIO(content)).convert("RGB")
+                w_orig, h_orig = pil_input.size
+                new_w = max(64, (w_orig // 32) * 32)
+                new_h = max(64, (h_orig // 32) * 32)
+                pil_input = pil_input.crop((0, 0, new_w, new_h))
+                rgb_in = np.array(pil_input).astype(np.float32) / 255.0
         elif image_base64 and len(image_base64) > 50:
             if image_base64.startswith("data:image"):
                 image_base64 = image_base64.split(",")[1]
@@ -372,6 +413,8 @@ async def run_super_resolution(
         LATEST_SR_STATE["aoi_id"] = aoi_id
         LATEST_SR_STATE["out_W"] = out_W
         LATEST_SR_STATE["out_H"] = out_H
+        LATEST_SR_STATE["crs"] = crs_uploaded
+        LATEST_SR_STATE["transform"] = transform_uploaded
 
         return JSONResponse(
             content={
@@ -422,10 +465,15 @@ async def export_geotiff(aoi_id: str = "user_lake", layer: str = "sr"):
             out_bands = np.stack([sr_rgb[:, :, 0], sr_rgb[:, :, 1], sr_rgb[:, :, 2], nir_band], axis=0)
             chosen_aoi = aoi_id
         
-        aoi_info = AOI_CATALOG.get(chosen_aoi, {"lat": 24.5854, "lon": 73.7125})
-        lat, lon = aoi_info.get("lat", 24.5854), aoi_info.get("lon", 73.7125)
-        d_deg = 0.04
-        transform = from_bounds(lon - d_deg, lat - d_deg, lon + d_deg, lat + d_deg, out_W, out_H)
+        if LATEST_SR_STATE.get("crs") is not None:
+            crs_target = LATEST_SR_STATE["crs"]
+            transform_target = LATEST_SR_STATE.get("transform")
+        else:
+            crs_target = "EPSG:4326"
+            aoi_info = AOI_CATALOG.get(chosen_aoi, {"lat": 24.5854, "lon": 73.7125})
+            lat, lon = aoi_info.get("lat", 24.5854), aoi_info.get("lon", 73.7125)
+            d_deg = 0.04
+            transform_target = from_bounds(lon - d_deg, lat - d_deg, lon + d_deg, lat + d_deg, out_W, out_H)
         
         os.makedirs("outputs/geotiffs", exist_ok=True)
         tif_filename = f"outputs/geotiffs/BharatSRM_2.5m_{chosen_aoi}_{layer}.tif"
@@ -439,8 +487,8 @@ async def export_geotiff(aoi_id: str = "user_lake", layer: str = "sr"):
             width=out_W,
             count=count,
             dtype=out_bands.dtype,
-            crs="EPSG:4326",
-            transform=transform,
+            crs=crs_target,
+            transform=transform_target,
         ) as dst:
             dst.write(out_bands)
             if count == 4:
