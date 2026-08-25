@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadGeotiffBtn = document.getElementById("downloadGeotiffBtn");
   if (downloadGeotiffBtn) {
     downloadGeotiffBtn.addEventListener("click", () => {
-      window.location.href = `/api/export_geotiff?aoi_id=${currentAoi}`;
+      window.location.href = `/api/export_geotiff?aoi_id=${currentAoi}&layer=${activeTab}`;
     });
   }
 

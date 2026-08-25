@@ -267,13 +267,13 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Multi-Angle Steger Linear Filter)
-        smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=7, sigmaColor=50, sigmaSpace=7)
-        angles = [0, 30, 45, 60, 90, 120, 135, 150]
+        # 5. Continuous PMGSY Rural Road Network Extraction (High-Linearity Corridor Filter)
+        smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=9, sigmaColor=75, sigmaSpace=11)
+        angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
         for ang in angles:
             rad = np.deg2rad(ang)
-            length = 17
+            length = 25
             kernel = np.zeros((length, length), dtype=np.uint8)
             cx, cy = length // 2, length // 2
             for i in range(-cx, cx + 1):
@@ -285,8 +285,8 @@ async def run_super_resolution(
             responses.append(th)
 
         max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 20, 255, cv2.THRESH_BINARY)
-        closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        _, road_thresh = cv2.threshold(max_resp, 28, 255, cv2.THRESH_BINARY)
+        closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
         clean_roads = np.zeros_like(closed_roads, dtype=bool)
@@ -294,8 +294,8 @@ async def run_super_resolution(
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
-            # Keep continuous linear paths (length >= 25 px, area >= 35 px)
-            if area >= 35 and max(sw, sh) >= 25:
+            # Strict corridor length span filter (length >= 50 px, area >= 45 px)
+            if max(sw, sh) >= 50 and area >= 45:
                 clean_roads[labels == i] = True
         clean_roads = clean_roads & (~water_mask)
 
@@ -330,9 +330,12 @@ async def run_super_resolution(
             "RMSE": 0.1695,
         }
 
-        # Save to latest state cache for direct GeoTIFF export
+        # Save to latest state cache for direct GeoTIFF export across all layers
         nir_band = np.clip(sr_rgb_uint8[:, :, 1] * 0.8 + sr_rgb_uint8[:, :, 0] * 0.2, 0, 255).astype(np.uint8)
-        LATEST_SR_STATE["bands"] = np.stack([sr_rgb_uint8[:, :, 0], sr_rgb_uint8[:, :, 1], sr_rgb_uint8[:, :, 2], nir_band], axis=0)
+        LATEST_SR_STATE["bands_sr"] = np.stack([sr_rgb_uint8[:, :, 0], sr_rgb_uint8[:, :, 1], sr_rgb_uint8[:, :, 2], nir_band], axis=0)
+        LATEST_SR_STATE["bands_roads"] = np.stack([road_overlay[:, :, 0], road_overlay[:, :, 1], road_overlay[:, :, 2]], axis=0)
+        LATEST_SR_STATE["bands_lulc"] = np.stack([comp_lulc[:, :, 0], comp_lulc[:, :, 1], comp_lulc[:, :, 2]], axis=0)
+        LATEST_SR_STATE["bands_uncertainty"] = np.stack([unc_rgb[:, :, 0], unc_rgb[:, :, 1], unc_rgb[:, :, 2]], axis=0)
         LATEST_SR_STATE["aoi_id"] = aoi_id
         LATEST_SR_STATE["out_W"] = out_W
         LATEST_SR_STATE["out_H"] = out_H
@@ -360,15 +363,21 @@ async def run_super_resolution(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/export_geotiff")
-async def export_geotiff(aoi_id: str = "user_lake"):
-    """Exports 4-band 2.5m Super-Resolved GeoTIFF with full geospatial CRS metadata for QGIS/ArcGIS."""
+async def export_geotiff(aoi_id: str = "user_lake", layer: str = "sr"):
+    """Exports 2.5m GeoTIFF (Scientific 4-Band or Active Thematic Layer) with full geospatial CRS metadata for QGIS/ArcGIS."""
     try:
         import rasterio
         from rasterio.transform import from_bounds
         from fastapi.responses import FileResponse
         
-        if LATEST_SR_STATE["bands"] is not None:
-            out_bands = LATEST_SR_STATE["bands"]
+        # Select appropriate bands based on requested layer
+        key = f"bands_{layer}"
+        if key in LATEST_SR_STATE and LATEST_SR_STATE[key] is not None:
+            out_bands = LATEST_SR_STATE[key]
+            out_H, out_W = LATEST_SR_STATE["out_H"], LATEST_SR_STATE["out_W"]
+            chosen_aoi = LATEST_SR_STATE["aoi_id"]
+        elif LATEST_SR_STATE.get("bands_sr") is not None:
+            out_bands = LATEST_SR_STATE["bands_sr"]
             out_H, out_W = LATEST_SR_STATE["out_H"], LATEST_SR_STATE["out_W"]
             chosen_aoi = LATEST_SR_STATE["aoi_id"]
         else:
@@ -386,28 +395,34 @@ async def export_geotiff(aoi_id: str = "user_lake"):
         transform = from_bounds(lon - d_deg, lat - d_deg, lon + d_deg, lat + d_deg, out_W, out_H)
         
         os.makedirs("outputs/geotiffs", exist_ok=True)
-        tif_filename = f"outputs/geotiffs/BharatSRM_2.5m_{chosen_aoi}.tif"
+        tif_filename = f"outputs/geotiffs/BharatSRM_2.5m_{chosen_aoi}_{layer}.tif"
         
+        count = out_bands.shape[0]
         with rasterio.open(
             tif_filename,
             "w",
             driver="GTiff",
             height=out_H,
             width=out_W,
-            count=4,
+            count=count,
             dtype=out_bands.dtype,
             crs="EPSG:4326",
             transform=transform,
         ) as dst:
             dst.write(out_bands)
-            dst.set_band_description(1, "Red (B4) 2.5m")
-            dst.set_band_description(2, "Green (B3) 2.5m")
-            dst.set_band_description(3, "Blue (B2) 2.5m")
-            dst.set_band_description(4, "Near-Infrared (B8) 2.5m")
+            if count == 4:
+                dst.set_band_description(1, "Red (B4) 2.5m")
+                dst.set_band_description(2, "Green (B3) 2.5m")
+                dst.set_band_description(3, "Blue (B2) 2.5m")
+                dst.set_band_description(4, "Near-Infrared (B8) 2.5m")
+            elif count == 3:
+                dst.set_band_description(1, f"{layer.upper()} Red Channel")
+                dst.set_band_description(2, f"{layer.upper()} Green Channel")
+                dst.set_band_description(3, f"{layer.upper()} Blue Channel")
             
         return FileResponse(
             path=tif_filename,
-            filename=f"BharatSRM_2.5m_{chosen_aoi}.tif",
+            filename=f"BharatSRM_2.5m_{chosen_aoi}_{layer}.tif",
             media_type="image/tiff",
         )
     except Exception as e:
