@@ -310,19 +310,14 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Dual Black/White Top-Hat + Building Roof Exclusion)
+        # 5. Continuous PMGSY Rural Road Network Extraction (Clean Proven Linear Ribbon Filter)
         gray_uint = (gray * 255.0).astype(np.uint8)
-        
-        # Bright building rooftops are strictly masked out (Never roads!)
-        is_bright_roof = (gray_uint > 155) | ((R_hr > 0.55) & (G_hr > 0.50) & (B_hr > 0.40))
-        building_mask = cv2.dilate((is_bright_roof.astype(np.uint8))*255, cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))) > 0
-        
         smooth_gray = cv2.bilateralFilter(gray_uint, d=7, sigmaColor=50, sigmaSpace=9)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
         for ang in angles:
             rad = np.deg2rad(ang)
-            length = 25
+            length = 21
             kernel = np.zeros((length, length), dtype=np.uint8)
             cx, cy = length // 2, length // 2
             for i in range(-cx, cx + 1):
@@ -330,27 +325,25 @@ async def run_super_resolution(
                 ky = int(cy + i * np.sin(rad))
                 if 0 <= kx < length and 0 <= ky < length:
                     kernel[ky, kx] = 1
-            # Extracts dark asphalt corridors (streets between buildings) and bright arterial highways
-            b_th = cv2.morphologyEx(smooth_gray, cv2.MORPH_BLACKHAT, kernel)
-            w_th = cv2.morphologyEx(smooth_gray, cv2.MORPH_TOPHAT, kernel)
-            responses.append(cv2.bitwise_or(b_th, w_th))
+            th = cv2.morphologyEx(smooth_gray, cv2.MORPH_TOPHAT, kernel)
+            responses.append(th)
 
         max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 16, 255, cv2.THRESH_BINARY)
+        _, road_thresh = cv2.threshold(max_resp, 22, 255, cv2.THRESH_BINARY)
         closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
-        # Strict exclusion: Roads must NOT overlap building rooftops or water bodies
-        valid_roads = (closed_roads > 0) & (~building_mask) & (~water_mask)
-        
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(valid_roads.astype(np.uint8)*255)
-        clean_roads = np.zeros_like(valid_roads, dtype=bool)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
+        clean_roads = np.zeros_like(closed_roads, dtype=bool)
         for i in range(1, num_labels):
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
             # Balanced road continuity filter (preserves arterial corridors and village paths)
-            if max(sw, sh) >= 30 and area >= 25:
+            if max(sw, sh) >= 30 and area >= 30:
                 clean_roads[labels == i] = True
+                
+        # Exclude real water bodies and rivers
+        clean_roads = clean_roads & (~water_mask)
 
         road_overlay = np.array(sr_img).copy()
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
