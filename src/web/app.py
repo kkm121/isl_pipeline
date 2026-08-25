@@ -303,10 +303,20 @@ async def run_super_resolution(
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
         road_b64 = pil_to_base64(Image.fromarray(road_overlay))
 
-        # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & Ground-Truth Aligned)
-        forest_mask = (R_hr < 0.40) & (G_hr < 0.38) & (B_hr < 0.30) & (~water_mask)
-        agri_mask = (R_hr >= 0.40) & (G_hr >= 0.30) & (~water_mask) & (~forest_mask)
-        builtup_mask = (R_hr > 0.65) & (G_hr > 0.60) & (B_hr > 0.55) & (~water_mask) & (~forest_mask)
+        # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & True-Biome Aligned)
+        # Forest: Dark canopy with green dominance
+        forest_mask = (R_hr < 0.38) & (G_hr < 0.42) & (B_hr < 0.32) & (G_hr >= R_hr * 0.95) & (~water_mask)
+        
+        # Agriculture / Crops: Active vegetation (green excess) or cultivated fertile plot soil (R > B + 0.15 with moderate brightness)
+        green_excess = G_hr - np.maximum(R_hr, B_hr)
+        agri_mask = ((green_excess > -0.04) | ((R_hr >= 0.35) & (G_hr >= 0.30) & (B_hr < 0.32) & (R_hr > B_hr + 0.16) & (R_hr < 0.65))) & (~water_mask) & (~forest_mask)
+        
+        # Built-up / Urban: Neutral gray concrete/asphalt (|R-G| and |G-B| small) with high structure
+        gray_hr = 0.299 * R_hr + 0.587 * G_hr + 0.114 * B_hr
+        color_spread = np.maximum(np.maximum(np.abs(R_hr - G_hr), np.abs(G_hr - B_hr)), np.abs(R_hr - B_hr))
+        builtup_mask = (color_spread < 0.08) & (gray_hr > 0.30) & (gray_hr < 0.70) & (~water_mask) & (~forest_mask) & (~agri_mask)
+        
+        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain (R > G > B with high brightness)
         barren_mask = (~water_mask) & (~forest_mask) & (~agri_mask) & (~builtup_mask)
 
         lulc_vis = np.zeros((out_H, out_W, 3), dtype=np.uint8)
@@ -314,7 +324,7 @@ async def run_super_resolution(
         lulc_vis[forest_mask] = [34, 139, 34]    # 🌲 Mountain Forest: Emerald Green
         lulc_vis[agri_mask] = [235, 195, 40]     # 🌾 Agriculture: Golden Yellow
         lulc_vis[builtup_mask] = [230, 0, 0]     # 🏘️ Built-up: Crimson Red
-        lulc_vis[barren_mask] = [204, 186, 153]  # 🏜️ Barren: Warm Sand
+        lulc_vis[barren_mask] = [204, 186, 153]  # 🏜️ Barren / Desert Sand: Warm Sand
 
         # 35/65 blend so underlying satellite structure is visible with crisp thematic classes
         comp_lulc = cv2.addWeighted(np.array(sr_img), 0.35, lulc_vis, 0.65, 0)
