@@ -310,7 +310,7 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Clean Proven Linear Ribbon Filter)
+        # 5. Continuous PMGSY Rural Road Network Extraction (Transport Corridor Linear Ribbon Filter)
         gray_uint = (gray * 255.0).astype(np.uint8)
         smooth_gray = cv2.bilateralFilter(gray_uint, d=7, sigmaColor=50, sigmaSpace=9)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
@@ -332,18 +332,20 @@ async def run_super_resolution(
         _, road_thresh = cv2.threshold(max_resp, 22, 255, cv2.THRESH_BINARY)
         closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
         
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(closed_roads)
-        clean_roads = np.zeros_like(closed_roads, dtype=bool)
+        # Exclude bright building rooftops (houses/metal roofs are not roads)
+        is_bright_roof = (R_hr > 0.58) & (G_hr > 0.52) & (B_hr > 0.42) & (gray_uint > 140)
+        valid_roads = (closed_roads > 0) & (~is_bright_roof) & (~water_mask)
+        
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(valid_roads.astype(np.uint8)*255)
+        clean_roads = np.zeros_like(valid_roads, dtype=bool)
         for i in range(1, num_labels):
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
-            # Balanced road continuity filter (preserves arterial corridors and village paths)
-            if max(sw, sh) >= 30 and area >= 30:
+            span = max(sw, sh)
+            # Transport corridor filter: requires continuous linear span (rejects small isolated house blocks)
+            if span >= 45 and area >= 35:
                 clean_roads[labels == i] = True
-                
-        # Exclude real water bodies and rivers
-        clean_roads = clean_roads & (~water_mask)
 
         road_overlay = np.array(sr_img).copy()
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
