@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   runBtn.addEventListener("click", triggerInference);
 
-  // 6. Download
+  // 6. Download PNG & Full GeoTIFF
   document.getElementById("downloadBtn").addEventListener("click", () => {
     if (!currentResults) return;
     const a = document.createElement("a");
@@ -178,6 +178,13 @@ document.addEventListener("DOMContentLoaded", () => {
     a.download = `bharatsrm_v4_${activeTab}_output.png`;
     a.click();
   });
+
+  const downloadGeotiffBtn = document.getElementById("downloadGeotiffBtn");
+  if (downloadGeotiffBtn) {
+    downloadGeotiffBtn.addEventListener("click", () => {
+      window.location.href = `/api/export_geotiff?aoi_id=${currentAoi}`;
+    });
+  }
 
   // Run on load
   triggerInference();

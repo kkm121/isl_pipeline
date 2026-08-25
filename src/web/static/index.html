@@ -211,9 +211,14 @@
           <button class="tab-btn" data-view="roads">🛣️ PMGSY Roads</button>
           <button class="tab-btn" data-view="lulc">🏙️ ISRO LULC</button>
         </div>
-        <button id="downloadBtn" style="padding: 8px 16px; border-radius: 6px; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
-          <i class="fa-solid fa-download"></i> Save PNG
-        </button>
+        <div style="display: flex; gap: 8px;">
+          <button id="downloadBtn" style="padding: 8px 14px; border-radius: 6px; background: var(--bg-dark); border: 1px solid var(--border); color: var(--text-main); font-size: 0.82rem; cursor: pointer;">
+            <i class="fa-solid fa-download"></i> Save PNG
+          </button>
+          <button id="downloadGeotiffBtn" style="padding: 8px 14px; border-radius: 6px; background: rgba(74, 222, 128, 0.15); border: 1px solid var(--accent-green); color: var(--accent-green); font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-file-arrow-down"></i> Export GeoTIFF (.tif)
+          </button>
+        </div>
       </div>
 
       <!-- Pixel-Perfect Split Slider -->
