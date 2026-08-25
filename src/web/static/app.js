@@ -88,6 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function onFileSelected(file) {
     document.querySelectorAll(".preset-btn").forEach(b => b.classList.remove("active"));
+    currentAoi = file.name.replace(/\.[^/.]+$/, "");
     uploadPrompt.innerHTML = `Loaded: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
     triggerInference();
   }
