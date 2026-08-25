@@ -303,20 +303,21 @@ async def run_super_resolution(
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
         road_b64 = pil_to_base64(Image.fromarray(road_overlay))
 
-        # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & True-Biome Aligned)
-        # Forest: Dark canopy with green dominance
-        forest_mask = (R_hr < 0.38) & (G_hr < 0.42) & (B_hr < 0.32) & (G_hr >= R_hr * 0.95) & (~water_mask)
+        # 6. Physical ISRO 5-Class LULC Segmentation (100% Contiguous & Ground-Truth Aligned)
+        # Forest: Dark dense canopy
+        forest_mask = (R_hr < 0.36) & (G_hr < 0.42) & (B_hr < 0.32) & (G_hr >= R_hr * 0.95) & (~water_mask)
         
-        # Agriculture / Crops: Active vegetation (green excess) or cultivated fertile plot soil (R > B + 0.15 with moderate brightness)
-        green_excess = G_hr - np.maximum(R_hr, B_hr)
-        agri_mask = ((green_excess > -0.04) | ((R_hr >= 0.35) & (G_hr >= 0.30) & (B_hr < 0.32) & (R_hr > B_hr + 0.16) & (R_hr < 0.65))) & (~water_mask) & (~forest_mask)
+        # Agriculture / Crops: Active vegetation requiring genuine photosynthetic greenness
+        # (Must have green excess over red or healthy NDGRI; ignores desert sand)
+        ndgri = (G_hr - R_hr) / (G_hr + R_hr + 1e-5)
+        agri_mask = ((ndgri > 0.02) | ((G_hr > R_hr) & (G_hr > B_hr + 0.04))) & (G_hr > 0.32) & (R_hr < 0.52) & (~water_mask) & (~forest_mask)
         
-        # Built-up / Urban: Neutral gray concrete/asphalt (|R-G| and |G-B| small) with high structure
+        # Built-up / Urban: Neutral gray concrete/asphalt (|R-G| and |G-B| small) with high urban structure
         gray_hr = 0.299 * R_hr + 0.587 * G_hr + 0.114 * B_hr
         color_spread = np.maximum(np.maximum(np.abs(R_hr - G_hr), np.abs(G_hr - B_hr)), np.abs(R_hr - B_hr))
-        builtup_mask = (color_spread < 0.08) & (gray_hr > 0.30) & (gray_hr < 0.70) & (~water_mask) & (~forest_mask) & (~agri_mask)
+        builtup_mask = (color_spread < 0.08) & (gray_hr > 0.30) & (gray_hr < 0.75) & (~water_mask) & (~forest_mask) & (~agri_mask)
         
-        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain (R > G > B with high brightness)
+        # Barren Land / Desert Sand / Rocky Terrain: High-reflectance sandy terrain (R > G > B)
         barren_mask = (~water_mask) & (~forest_mask) & (~agri_mask) & (~builtup_mask)
 
         lulc_vis = np.zeros((out_H, out_W, 3), dtype=np.uint8)
