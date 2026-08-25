@@ -254,13 +254,15 @@ async def run_super_resolution(
         G_hr = cv2.resize(G, (out_W, out_H), interpolation=cv2.INTER_CUBIC)
         B_hr = cv2.resize(B, (out_W, out_H), interpolation=cv2.INTER_CUBIC)
         
-        # Clean Water Detection (High Green/Cyan relative to Red)
-        water_raw = (G_hr > R_hr + 0.03) & (G_hr > 0.45) & (B_hr > 0.35)
+        # Clean Water & River Body Detection (Lakes, Rivers, Canals, Streams)
+        water_raw = ((G_hr > R_hr + 0.02) & (G_hr > 0.38) & (B_hr > 0.28)) | ((B_hr >= R_hr) & (gray < 0.28))
         water_uint8 = (water_raw.astype(np.uint8)) * 255
         water_closed = cv2.morphologyEx(water_uint8, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15)))
-        water_mask = water_closed > 0
+        # 9px safety buffer along river shorelines, water meanders, and stream beds
+        water_dilated = cv2.dilate(water_closed, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)))
+        water_mask = water_dilated > 0
 
-        # Lake has near-zero uncertainty; terrain has higher variance
+        # Lake and rivers have near-zero uncertainty; terrain has higher variance
         unc_map = np.clip(local_std * 1.3 + 0.02, 0.0, 0.30)
         unc_map[water_mask] = 0.01
         norm_unc = unc_map / 0.30
@@ -268,6 +270,7 @@ async def run_super_resolution(
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
         # 5. Continuous PMGSY Rural Road Network Extraction (Multi-Angle Linear Corridor Filter)
+        # Strict river exclusion: Rivers/streams are NEVER classified as roads
         smooth_gray = cv2.bilateralFilter((gray * 255).astype(np.uint8), d=7, sigmaColor=50, sigmaSpace=9)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
         responses = []
@@ -297,7 +300,11 @@ async def run_super_resolution(
             # Balanced road continuity filter (preserves arterial corridors and village paths)
             if max(sw, sh) >= 30 and area >= 30:
                 clean_roads[labels == i] = True
+                
+        # Zero overlap with rivers, lakes, canals, and water beds
         clean_roads = clean_roads & (~water_mask)
+        # Roads must have mineral/asphalt reflectance (never dark/turbid water)
+        clean_roads = clean_roads & (R_hr >= 0.20) & (gray >= 0.22)
 
         road_overlay = np.array(sr_img).copy()
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
