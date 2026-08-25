@@ -269,21 +269,14 @@ async def run_super_resolution(
         unc_rgb = (cm.turbo(norm_unc)[:, :, :3] * 255).astype(np.uint8)
         unc_b64 = pil_to_base64(Image.fromarray(unc_rgb))
 
-        # 5. Continuous PMGSY Rural Road Network Extraction (Transport Corridor Filter with Ravine Suppression)
-        # Suppress dark mountain crevices, wadis, and shadow gullies
+        # 5. Continuous PMGSY Rural Road Network Extraction (Dual-Corridor Black/White Top-Hat + Zhang-Suen Centerlines)
         gray_uint = (gray * 255.0).astype(np.uint8)
-        dark_crevices = (gray_uint < 65)
-        dark_crevices_dilated = cv2.dilate(dark_crevices.astype(np.uint8)*255, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))) > 0
-
-        # Terrain roughness: natural rocky fissures and wadis have extreme local standard deviation; paved roads are smooth corridors
-        mean_g = cv2.blur(gray_uint.astype(np.float32), (7, 7))
-        sq_mean_g = cv2.blur(gray_uint.astype(np.float32)**2, (7, 7))
-        local_roughness = np.sqrt(np.maximum(0, sq_mean_g - mean_g**2))
-        rugged_terrain_mask = local_roughness > 32.0
-
         smooth_gray = cv2.bilateralFilter(gray_uint, d=7, sigmaColor=40, sigmaSpace=7)
+        
+        # Extract both dark asphalt corridors (streets in cities) and bright paved corridors (rural highways)
         angles = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5]
-        responses = []
+        dark_responses, bright_responses = [], []
+        
         for ang in angles:
             rad = np.deg2rad(ang)
             length = 21
@@ -294,24 +287,39 @@ async def run_super_resolution(
                 ky = int(cy + i * np.sin(rad))
                 if 0 <= kx < length and 0 <= ky < length:
                     kernel[ky, kx] = 1
-            th = cv2.morphologyEx(smooth_gray, cv2.MORPH_TOPHAT, kernel)
-            responses.append(th)
-
-        max_resp = np.maximum.reduce(responses)
-        _, road_thresh = cv2.threshold(max_resp, 20, 255, cv2.THRESH_BINARY)
-        closed_roads = cv2.morphologyEx(road_thresh, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+            dark_responses.append(cv2.morphologyEx(smooth_gray, cv2.MORPH_BLACKHAT, kernel))
+            bright_responses.append(cv2.morphologyEx(smooth_gray, cv2.MORPH_TOPHAT, kernel))
+            
+        max_dark = np.maximum.reduce(dark_responses)
+        max_bright = np.maximum.reduce(bright_responses)
         
-        valid_candidates = (closed_roads > 0) & (~water_mask) & (~dark_crevices_dilated) & (~rugged_terrain_mask) & (R_hr >= 0.20)
+        _, dark_thresh = cv2.threshold(max_dark, 14, 255, cv2.THRESH_BINARY)
+        _, bright_thresh = cv2.threshold(max_bright, 18, 255, cv2.THRESH_BINARY)
         
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(valid_candidates.astype(np.uint8))
-        clean_roads = np.zeros_like(valid_candidates, dtype=bool)
+        combined_candidates = cv2.bitwise_or(dark_thresh, bright_thresh)
+        
+        # Shape filter: Exclude compact 2D polygons (rooftops/buildings) and keep 1D thin filaments (roads)
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(combined_candidates)
+        road_mask = np.zeros_like(combined_candidates, dtype=bool)
+        
         for i in range(1, num_labels):
             area = stats[i, cv2.CC_STAT_AREA]
             sw = stats[i, cv2.CC_STAT_WIDTH]
             sh = stats[i, cv2.CC_STAT_HEIGHT]
-            # Balanced road continuity filter (preserves arterial corridors and village paths)
-            if max(sw, sh) >= 25 and area >= 25:
-                clean_roads[labels == i] = True
+            length_span = max(sw, sh)
+            if length_span >= 25 and area >= 20:
+                density = area / (sw * sh + 1e-4)
+                # True road corridors have low bounding box fill density (< 0.40)
+                if density < 0.40:
+                    road_mask[labels == i] = True
+                    
+        # Zhang-Suen Thinning to extract exact 2px clean road centerlines
+        if hasattr(cv2, 'ximgproc'):
+            skel = cv2.ximgproc.thinning((road_mask.astype(np.uint8))*255)
+        else:
+            skel = (road_mask.astype(np.uint8))*255
+        clean_roads = cv2.dilate(skel, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))) > 0
+        clean_roads = clean_roads & (~water_mask)
 
         road_overlay = np.array(sr_img).copy()
         road_overlay[clean_roads] = [255, 215, 0] # Amber gold vector lines
